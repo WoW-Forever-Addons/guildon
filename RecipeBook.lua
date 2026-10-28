@@ -20,7 +20,8 @@ local TOP = 58
 
 ns.BOOK_FILTERS = { "all", "someone", "nobody", "mine", "online" }
 local FILTER_TEXT = { all = "All recipes", someone = "Someone can", nobody = "Nobody can", mine = "I can", online = "Online now" }
-local SRC_TEXT = { t = "Trainer", i = "Recipe item", q = "Quest", s = "Learned with the profession", c = "Trainer or recipe (classic data)" }
+local SRC_TEXT = { t = "Trainer", i = "Recipe item", q = "Quest", s = "Learned with the profession", c = "Trainer or recipe (classic data)",
+  f = "New in Forever (client data)", p = "Seen in the game (player report)" }
 
 local function Hex(classFile) return ns.ClassHex(classFile) end
 local function ClassOf(owner)
@@ -209,7 +210,7 @@ local function CrafterRows(rec)
   for i, e in ipairs(list) do
     if not (cut and i > TOP_CRAFTERS) then
       local hint
-      if p.craft and e.n == 0 then
+      if p.craft and not p.gather and e.n == 0 then
         hint = e.owner == me and L["Open your profession window once so that Guildon can read your recipes."]
           or L["Recipes not read yet."]
       end
@@ -217,7 +218,7 @@ local function CrafterRows(rec)
       out[#out + 1] = { key = "m:" .. p.id .. ":" .. e.owner, owner = e.owner, prof = p.id,
         text = UI.Dot(e.on) .. " " .. Colored(e.owner) .. (e.on and "" or ("  |c" .. Style.Hex("textHint") .. L["offline"] .. "|r")),
         cols = { "|c" .. ns.ClassHex(ClassOf(e.owner)) .. ClassName(e.owner) .. "|r" },
-        value = ("%d / %d"):format(e.rank or 0, e.max or 0) .. ((p.craft and e.n == 0) and " *" or ""),
+        value = ("%d / %d"):format(e.rank or 0, e.max or 0) .. ((p.craft and not p.gather and e.n == 0) and " *" or ""),
         meter = { e.rank or 0, e.max or 0, full and C.good or nil },
         tooltip = function()
           local lines = { L["Skill %d of %d"]:format(e.rank or 0, e.max or 0) }

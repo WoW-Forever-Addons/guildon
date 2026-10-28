@@ -24,6 +24,7 @@ Ordner `Guildon` in den AddOns-Ordner des Clients kopieren (`...\Interface\AddOn
 - `/gn sync` die Gilde jetzt nach neuen Daten fragen
 - `/gn demo` Beispielgilde (nochmal: aus)
 - `/gn export` deine Berufe als Text für die Gildenseite
+- `/gn recipes` Rezepte, die das Spiel gezeigt hat und Guildon noch nicht kennt, als Text für die Guildon-Autoren
 - `/gn diag` Stand des Austauschs und Fehler
 - `/gn help` alle Befehle
 
@@ -31,7 +32,7 @@ Ordner `Guildon` in den AddOns-Ordner des Clients kopieren (`...\Interface\AddOn
 - Austausch nur über Addon-Nachrichten im Gildenkanal, Daten in Stücken mit Prüfsumme, abgeholt per Flüstern. Positionen höchstens alle 4 Sekunden und nur, wenn jemand zuschaut, nie in Instanzen (außer mit Schalter).
 - Handel und Post: Guildon legt Gegenstände nur nach deinem Klick ein. Annehmen und Senden bleiben bei dir.
 - Preise der AH-Addons über deren öffentliche Schnittstellen, jeder Aufruf geschützt (pcall).
-- Rezeptdaten aus All The Things (MIT) und CMaNGOS classic-db (GPL v3), für Forever und Era.
+- Rezeptdaten aus All The Things (MIT) und CMaNGOS classic-db (GPL v3), für Forever und Era. Lager-Rezepte für Forever: Data from ForeverDB.net (https://foreverdb.net), GPL v3.
 
 ## Lizenz
 Code: MIT, siehe LICENSE.txt. Rezeptdaten (Data/Recipes.lua, DataEra/Recipes.lua): GPL v3, weil sie aus CMaNGOS gebaut sind, Text in Data/Recipes-LICENSE-GPLv3.txt. Das Addon als Ganzes steht damit unter GPL v3. Autor: DonCoohd.

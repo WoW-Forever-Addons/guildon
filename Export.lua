@@ -170,3 +170,48 @@ function ns.ShowExport()
     L["%d characters. Press Ctrl+C to copy, then paste the text on the guild website."]:format(n), text)
   return true
 end
+
+---------------------------------------------------------------------------
+-- Recipe report (/gn recipes): what the game showed that Guildon's data lacks, for the Guildon authors.
+-- Line 1 "GNR1;<F or E>;<version>;<client build>", then one line per recipe, sorted by spell:
+-- "<spell>;<profession>;<item>;<count>;<reagent:n,reagent:n>;<n new | r reagents missing in the data>".
+-- Sources: the own windows (ns.db.found, ns.db.learned) and what guild members share (kinds "prof" and "seen"). tools/guildon_report.py reads it.
+---------------------------------------------------------------------------
+function ns.RecipeReport()
+  local idx = ns.CraftIndex()
+  local prof = {}
+  for _, p in pairs(idx.owners) do
+    for skill, e in pairs(p.skills) do for id in pairs(e.recipes) do prof[id] = prof[id] or skill end end
+  end
+  for id, skill in pairs(ns.db.found) do prof[id] = prof[id] or skill end
+  for id, skill in pairs(idx.seen or {}) do prof[id] = prof[id] or skill end
+  local ids = {}
+  for id in pairs(prof) do if ns.NeedsDetails(id) then ids[#ids + 1] = id end end
+  for id in pairs(idx.details) do if not prof[id] and ns.NeedsDetails(id) then ids[#ids + 1] = id end end
+  table.sort(ids)
+  local build = select(2, ns.Call(GetBuildInfo)) or "?"
+  local lines = { ("GNR1;%s;%s;%s"):format(ns.ERA and "E" or "F", ns.VERSION or "?", tostring(build)) }
+  local n = 0
+  for _, id in ipairs(ids) do
+    local d = idx.details[id]
+    local reag = {}
+    if d then for j = 1, #(d[3] or {}), 2 do reag[#reag + 1] = d[3][j] .. ":" .. d[3][j + 1] end end
+    local r = ns.RECIPES[id]
+    local skill = prof[id] or (r and r[1]) or 0
+    lines[#lines + 1] = ("%d;%d;%d;%d;%s;%s"):format(id, skill, d and d[1] or 0, d and d[2] or 0, table.concat(reag, ","),
+      r and "r" or "n")
+    n = n + 1
+  end
+  return table.concat(lines, "\n"), n
+end
+
+function ns.ShowRecipeReport()
+  local text, n = ns.RecipeReport()
+  if n == 0 then
+    ns.Print(L["Guildon knows all recipes the game has shown so far. Open your profession windows to look again."])
+    return false
+  end
+  ns.ShowCopyBox(L["Recipes Guildon does not know yet"],
+    L["%d recipes. Press Ctrl+C to copy and send the text to the Guildon authors (Discord or CurseForge)."]:format(n), text)
+  return true
+end

@@ -473,7 +473,7 @@ function ns.CanGather(item)
   for _, entry in pairs(ns.db.prof or {}) do
     for skill in pairs(entry) do
       local p = ns.PROF_BY_ID[skill]
-      if p and not p.craft or skill == 186 then
+      if p and p.gather or skill == 186 then
         if not prof or prof == skill then return true end
       end
     end

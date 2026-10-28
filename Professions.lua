@@ -13,7 +13,8 @@ local L = ns.L
 ---------------------------------------------------------------------------
 ns.RECIPES = ns.RECIPES or {}
 
--- skill line, rank spell (name and icon from the game), fallback icon; craft = has recipes
+-- skill line, rank spell (name and icon from the game), fallback icon; craft = has recipes (set below for gathering
+-- professions that have recipes in the data); gather = gathering profession
 ns.PROFS = {
   { id = 171, spell = 2259, icon = "Interface\\Icons\\Trade_Alchemy", name = "Alchemy", craft = true },
   { id = 164, spell = 2018, icon = "Interface\\Icons\\Trade_BlackSmithing", name = "Blacksmithing", craft = true },
@@ -24,12 +25,17 @@ ns.PROFS = {
   { id = 185, spell = 2550, icon = "Interface\\Icons\\INV_Misc_Food_15", name = "Cooking", craft = true },
   { id = 129, spell = 3273, icon = "Interface\\Icons\\Spell_Holy_SealOfSacrifice", name = "First Aid", craft = true },
   { id = 186, spell = 2575, icon = "Interface\\Icons\\Trade_Mining", name = "Mining", craft = true },
-  { id = 182, spell = 2366, icon = "Interface\\Icons\\Spell_Nature_NatureTouchGrow", name = "Herbalism" },
-  { id = 393, spell = 8613, icon = "Interface\\Icons\\INV_Misc_Pelt_Wolf_01", name = "Skinning" },
-  { id = 356, spell = 7620, icon = "Interface\\Icons\\Trade_Fishing", name = "Fishing" },
+  { id = 182, spell = 2366, icon = "Interface\\Icons\\Spell_Nature_NatureTouchGrow", name = "Herbalism", gather = true },
+  { id = 393, spell = 8613, icon = "Interface\\Icons\\INV_Misc_Pelt_Wolf_01", name = "Skinning", gather = true },
+  { id = 356, spell = 7620, icon = "Interface\\Icons\\Trade_Fishing", name = "Fishing", gather = true },
 }
 ns.PROF_BY_ID = {}
 for i, p in ipairs(ns.PROFS) do p.order = i ns.PROF_BY_ID[p.id] = p end
+-- gathering professions get a recipe book where the data has recipes for them (Forever camp: Camp Chair, Fish Bowl, Greenhouse ...)
+for _, r in pairs(ns.RECIPES) do
+  local p = ns.PROF_BY_ID[r[1]]
+  if p then p.craft = true end
+end
 
 ---------------------------------------------------------------------------
 -- Game lookups (Forever has the C_ calls, Era the old ones)
@@ -112,8 +118,17 @@ function ns.UnB36(s) return tonumber(s, 36) end
 
 ---------------------------------------------------------------------------
 -- Own professions: ns.db.prof[<char>] = { [skill] = { rank, max, recipes = { [spell] = true }, read = time } },
--- ns.db.learned[spell] = { item, count, { reagent, n, ... } } for recipes the static data lacks.
+-- ns.db.learned[spell] = { item, count, { reagent, n, ... } } for recipes the static data lacks or knows without reagents
+-- (ns.NeedsDetails; item 0 for enchants), ns.db.found[spell] = profession for recipes the own window lists that the
+-- static data lacks, learned or not (Forever shows the whole profession).
 ---------------------------------------------------------------------------
+-- the game's result and reagents are wanted: recipe not in the static data, or there without reagents (Forever client
+-- data and name-matched ATT rows: no reagent table, tools/build_recipes.py)
+function ns.NeedsDetails(id)
+  local r = ns.RECIPES[id]
+  return not r or (r[7] or "") == ""
+end
+
 local function Mine()
   local me = ns.MyName()
   if not me then return nil end
@@ -149,9 +164,15 @@ function ns.SetRecipes(skill, rank, max, spells, full, details)
   mine[skill] = e
   if details then
     for id, d in pairs(details) do
-      if not ns.RECIPES[id] then ns.db.learned[id] = d end
+      if ns.NeedsDetails(id) then ns.db.learned[id] = d end
     end
   end
+end
+
+-- recipes the own window lists that the static data lacks (also unlearned ones): kept for the recipe book and /gn recipes
+function ns.SetFound(skill, list)
+  if not ns.PROF_BY_ID[skill] or type(list) ~= "table" then return end
+  for _, id in ipairs(list) do if not ns.RECIPES[id] then ns.db.found[id] = skill end end
 end
 
 -- the "prof" set of the current character
@@ -169,7 +190,7 @@ function ns.EncodeProf(entry)
     for i, id in ipairs(spells) do
       enc[i] = ns.B36(id)
       local d = ns.db.learned[id]
-      if d and not ns.RECIPES[id] and d[1] then
+      if d and ns.NeedsDetails(id) and d[1] then
         local r = { ns.B36(id) .. "=" .. ns.B36(d[1]) .. "x" .. (d[2] or 1) }
         for j = 1, #(d[3] or {}), 2 do r[#r + 1] = ns.B36(d[3][j]) .. "x" .. d[3][j + 1] end
         extra[#extra + 1] = table.concat(r, ".")
@@ -230,6 +251,42 @@ ns.RegisterKind("prof", {
 })
 
 ---------------------------------------------------------------------------
+-- Recipes the game showed that the static data lacks or knows without reagents, learned or not (Daniel 28.10.: "Ungelernte
+-- Rezepte an die Gilde schicken, damit alle sie sehen"): kind "seen", the same set format as "prof" with the profession's
+-- rank and max at 0, so the whole guild's recipe books and /gn recipes have them. Older Guildon versions ignore the kind.
+---------------------------------------------------------------------------
+local SEEN_MAX = 15000 -- below Comm's MAX_SET; details are left out first when the list gets that long
+
+function ns.EncodeSeen()
+  local byProf = {}
+  local function add(id, skill)
+    if not ns.PROF_BY_ID[skill or 0] then return end
+    byProf[skill] = byProf[skill] or { recipes = {} }
+    byProf[skill].recipes[id] = true
+  end
+  for id, skill in pairs(ns.db.found) do if not ns.RECIPES[id] then add(id, skill) end end
+  for id in pairs(ns.db.learned) do
+    if ns.NeedsDetails(id) then add(id, ns.db.found[id] or (ns.RECIPES[id] and ns.RECIPES[id][1])) end
+  end
+  if not next(byProf) then return nil end
+  -- EncodeProf adds the details from ns.db.learned; too long: the plain list (others still see the recipe, without reagents)
+  local s = ns.EncodeProf(byProf)
+  if #s > SEEN_MAX then s = s:match("^[^#]*") end
+  if #s > SEEN_MAX then return nil end
+  return s
+end
+
+function ns.ShareSeen()
+  local s = ns.EncodeSeen()
+  if s then ns.SetOwn("seen", s) end
+end
+
+ns.RegisterKind("seen", {
+  validate = function(d) return d:match("^[%w:,|#;=x%.]+$") ~= nil and ns.DecodeProf(d) ~= nil end,
+  onUpdate = function() ns.InvalidateCrafters() end,
+})
+
+---------------------------------------------------------------------------
 -- Who can craft what: index over all "prof" sets (own characters included), rebuilt on demand
 ---------------------------------------------------------------------------
 local index -- { crafters = { [spell] = { owner, ... } }, skills = { [prof] = { { owner, rank, max, n } } }, details }
@@ -252,6 +309,17 @@ local function BuildIndex()
         end
         index.skills[skill] = index.skills[skill] or {}
         table.insert(index.skills[skill], { owner = set.o, rank = e.rank, max = e.max, n = n, t = set.t })
+      end
+      for id, det in pairs(p.details) do if not index.details[id] then index.details[id] = det end end
+    end
+  end
+  -- what guild members' windows showed (kind "seen"): recipe list per profession and the game's details; own data wins
+  index.seen = {}
+  for _, set in ipairs(ns.SetsOf("seen")) do
+    local p = ns.DecodeProf(set.d)
+    if p then
+      for skill, e in pairs(p.skills) do
+        for id in pairs(e.recipes) do if not index.seen[id] then index.seen[id] = skill end end
       end
       for id, det in pairs(p.details) do if not index.details[id] then index.details[id] = det end end
     end
@@ -288,10 +356,12 @@ function ns.RecipeInfo(spell)
     for item, n in tostring(r[7] or ""):gmatch("(%d+):(%d+)") do out.reagents[#out.reagents + 1] = { tonumber(item), tonumber(n) } end
   end
   local d = ns.CraftIndex().details[spell]
-  if d and (not out.item or out.item == 0) then
-    out.item, out.count = d[1], d[2]
-    out.reagents = {}
-    for j = 1, #(d[3] or {}), 2 do out.reagents[#out.reagents + 1] = { d[3][j], d[3][j + 1] } end
+  if d then
+    if (not out.item or out.item == 0) and (d[1] or 0) > 0 then out.item, out.count = d[1], d[2] end
+    if not out.reagents or #out.reagents == 0 then
+      out.reagents = {}
+      for j = 1, #(d[3] or {}), 2 do out.reagents[#out.reagents + 1] = { d[3][j], d[3][j + 1] } end
+    end
   end
   return out
 end
@@ -305,6 +375,10 @@ function ns.RecipesOf(prof)
   for _, p in pairs(ns.CraftIndex().owners) do
     local e = p.skills[prof]
     if e then for id in pairs(e.recipes) do if not seen[id] then seen[id] = true out[#out + 1] = id end end end
+  end
+  for id, skill in pairs(ns.db.found) do if skill == prof and not seen[id] then seen[id] = true out[#out + 1] = id end end
+  for id, skill in pairs(ns.CraftIndex().seen) do
+    if skill == prof and not seen[id] then seen[id] = true out[#out + 1] = id end
   end
   return out
 end
@@ -351,14 +425,18 @@ local function ReadWindowRetail()
   local info = ns.Call(T.GetBaseProfessionInfo)
   local ids = ns.Call(T.GetAllRecipeIDs)
   if type(ids) ~= "table" then return nil end
-  local spells, details = {}, {}
+  -- the window lists the whole profession: learned recipes go to the own list; for every recipe the static data lacks or
+  -- knows without reagents (learned or not) the game's result and reagents are kept, unknown ones also in ns.db.found
+  local spells, details, found = {}, {}, {}
   for _, id in ipairs(ids) do
     local ri = ns.Call(T.GetRecipeInfo, id)
-    if type(ri) == "table" and ri.learned == true and ns.Num(id) then
-      spells[#spells + 1] = id
-      if not ns.RECIPES[id] then
+    if type(ri) == "table" and ns.Num(id) then
+      if ri.learned == true then spells[#spells + 1] = id end
+      if not ns.RECIPES[id] then found[#found + 1] = id end
+      local have = ns.db.learned[id]
+      if ns.NeedsDetails(id) and not (have and #(have[3] or {}) > 0) then
         local sch = ns.Call(T.GetRecipeSchematic, id, false)
-        if type(sch) == "table" and ns.Num(sch.outputItemID) then
+        if type(sch) == "table" then
           local reag = {}
           for _, slot in ipairs(sch.reagentSlotSchematics or {}) do
             local r = slot.reagents and slot.reagents[1]
@@ -367,7 +445,8 @@ local function ReadWindowRetail()
               reag[#reag + 1] = slot.quantityRequired
             end
           end
-          details[id] = { sch.outputItemID, ns.Num(sch.quantityMin) or 1, reag }
+          local item = ns.Num(sch.outputItemID) or 0 -- enchants make no item
+          if item > 0 or #reag > 0 then details[id] = { item, ns.Num(sch.quantityMin) or 1, reag } end
         end
       end
     end
@@ -376,7 +455,8 @@ local function ReadWindowRetail()
   if not (skill and ns.PROF_BY_ID[skill]) then skill = ns.ProfOfSpells(spells) end
   if not skill then return nil end
   return { skill = skill, rank = type(info) == "table" and ns.Num(info.skillLevel) or nil,
-    max = type(info) == "table" and ns.Num(info.maxSkillLevel) or nil, spells = spells, full = true, details = details }
+    max = type(info) == "table" and ns.Num(info.maxSkillLevel) or nil, spells = spells, full = true, details = details,
+    found = found }
 end
 
 function ns.ReadSkills()
@@ -390,7 +470,9 @@ function ns.ReadWindow(kind)
   if ns.ERA then r = ns.ReadWindowEra and ns.ReadWindowEra(kind) else r = ReadWindowRetail() end
   if not r or #r.spells == 0 then return false end
   ns.SetRecipes(r.skill, r.rank, r.max, r.spells, r.full, r.details)
+  if r.found then ns.SetFound(r.skill, r.found) end
   ns.ShareProf()
+  ns.ShareSeen()
   ns.InvalidateCrafters()
   if ns.OnDataChanged then ns.OnDataChanged("prof", ns.MyName()) end
   return true
@@ -431,8 +513,12 @@ end
 ns.OnInit(function()
   ns.db.prof = type(ns.db.prof) == "table" and ns.db.prof or {}
   ns.db.learned = type(ns.db.learned) == "table" and ns.db.learned or {}
+  ns.db.found = type(ns.db.found) == "table" and ns.db.found or {}
+  -- recipes a newer data file now has with reagents are no longer kept
+  for id in pairs(ns.db.learned) do if not ns.NeedsDetails(id) then ns.db.learned[id] = nil end end
+  for id in pairs(ns.db.found) do if ns.RECIPES[id] then ns.db.found[id] = nil end end
 end)
-ns.On("PLAYER_LOGIN", function() ns.After(9, ns.ReadSkills) ns.After(11, ns.ReadKnown) end)
+ns.On("PLAYER_LOGIN", function() ns.After(9, ns.ReadSkills) ns.After(10, ns.ShareSeen) ns.After(11, ns.ReadKnown) end)
 ns.On("SKILL_LINES_CHANGED", function() ns.After(1, ns.ReadSkills) ns.After(2, ns.ReadKnown) end)
 ns.On("TRADE_SKILL_SHOW", function() ReadSoon("tradeskill") end)
 ns.On("TRADE_SKILL_LIST_UPDATE", function() ReadSoon("tradeskill") end)

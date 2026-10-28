@@ -203,6 +203,7 @@ ns.COMMANDS = {
   { "/gn diag", "state of the exchange and errors" },
   { "/gn demo", "example guild to try the windows (again: off)" },
   { "/gn export", "your professions as text for the guild website" },
+  { "/gn recipes", "recipes the game showed that Guildon does not know yet, to send to the authors" },
   { "/gn help", "this list" },
 }
 
@@ -226,6 +227,8 @@ function ns.Slash(msg)
     if ns.SetDemo then ns.SetDemo(msg == "demo off" and false or (msg == "demo on" and true or not ns.demo)) end
   elseif msg == "export" then
     if ns.ShowExport then ns.ShowExport() end
+  elseif msg == "recipes" or msg == "rezepte" then
+    if ns.ShowRecipeReport then ns.ShowRecipeReport() end
   elseif msg == "diag" then
     if ns.PrintDiag then ns.PrintDiag() end
   elseif msg == "help" or msg == "?" or msg == "hilfe" then

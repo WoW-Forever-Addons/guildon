@@ -282,5 +282,6 @@ function ns.PrintDiag()
   if ns.ForeignPinLevels then
     for _, line in ipairs(ns.ForeignPinLevels()) do print("  " .. line) end
   end
+  if ns.RecipeReport then print(("  recipes the data lacks or knows without reagents: %d (/gn recipes)"):format(select(2, ns.RecipeReport()))) end
   for _, e in ipairs(ns.Errors()) do print(("  error [%s] x%d: %s"):format(e.context, e.count, e.msg)) end
 end
