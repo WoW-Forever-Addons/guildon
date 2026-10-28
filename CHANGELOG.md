@@ -1,0 +1,24 @@
+# Changes
+
+## Next
+- Removed the test commands /gn libra, /gn crest and /gn prices. /gn demo and /gn diag stay.
+- Wishes are marked received on their own when the crafter's goods come in a trade or when you open the crafter's letter with them, so the list stays short in big guilds.
+- Choose the look of the map pins (Map tab, with a preview): guild sign, shield only or a plain dot, always in the class colour.
+- Fixed: in the wish form a long hint ("Nobody in the guild knows it yet ...") no longer covers the reagents; the form grows instead.
+- Fixed: the Map tab counted "0 members" while the zones were closed.
+- Fixed: in the options a description over two lines no longer covers the next row.
+- Fixed: reagent names that the game sends later ("Item 2835") now show up in the open wish form.
+- Example guild: the members of the list no longer walk along with you on the map; the travellers in many zones stay.
+
+## 0.7.0 (first version for testers)
+
+Guildon is the guild's all-in-one helper for WoW Forever and WoW Classic Era. Everything works between members who have Guildon; there is no server, the data travels through the guild's addon channel.
+
+- **Professions and recipes of the guild:** every member's professions with skill, all recipes of a profession with a mark who in the guild can craft them (green when someone is online), search, filters, groups by type (armour by slot, food by buff), reagents with what you have, whisper the crafter with the item link.
+- **Wish list:** wish a recipe instead of asking around: amount, "I bring the reagents", "I pay for the reagents" or "short of money", tip, note, for everyone or one crafter. Crafters see the wishes they can craft, accept, mark crafted and sent; you mark it received. Wishes for gathered goods reach the guild's gatherers. Officers may delete wishes; the guild master chooses which ranks count as officers.
+- **Trade and mail:** a bar below the trade window and the mailbox puts in the reagents or the goods of an order, one stack per click, fills in the letter and cash on delivery. You accept the trade and send the letter yourself.
+- **Prices and profitable crafts:** prices from Auctionator, Auctioneer or aux are shared with the guild (the newest scan counts, odd prices are marked); without an AH addon a short scan at the auction house. The tab Profitable lists recipes by profit per craft.
+- **Map:** members with Guildon on the world map and the minimap, a dot in class colour with the level. Share your position with the guild, only with your group, or not at all; hidden in dungeons and when flagged for PvP.
+- **And more:** guild cooldowns (transmute, Mooncloth, Salt Shaker), "recipe wanted" with tooltip lines on recipe items, shopping lists, a note when a crafter for your wish comes online, alts linked, member tooltips with professions, the guild emblem, a thanks counter, Questdon's arrow to a member, "crafted in the guild by" in item tooltips, an export of your professions for the guild website (`/gn export`).
+- **Try it alone:** `/gn demo` shows an example guild (only on your screen).
+- **Your language:** English, German, French, Spanish, Brazilian Portuguese, Russian, Korean and Traditional Chinese.
