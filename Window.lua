@@ -26,7 +26,8 @@ ns.TABS = {
   { key = "professions", title = "Professions", icon = "Interface\\Icons\\Trade_BlackSmithing" },
   { key = "recipes", title = "Recipes", icon = "Interface\\Icons\\INV_Scroll_03" },
   { key = "wishes", title = "Wish list", icon = "Interface\\Icons\\INV_Letter_15" },
-  { key = "profit", title = "Profitable", icon = "Interface\\Icons\\INV_Misc_Coin_02" },
+  -- (Discord 30.10.: "warum muss das in einem Gildenaddon sein?") off by default, switched on in the options
+  { key = "profit", title = "Profitable", icon = "Interface\\Icons\\INV_Misc_Coin_02", optional = "showProfit" },
   { key = "members", title = "Members", icon = "Interface\\Icons\\INV_Misc_GroupNeedMore" },
   { key = "map", title = "Map", icon = "Interface\\Icons\\INV_Misc_Map_01" },
   { key = "options", title = "Options", icon = "Interface\\Icons\\Trade_Engineering" },
@@ -543,6 +544,9 @@ local function BuildOptions(p)
   p.mmb = Toggle(1, L["Minimap button"], L["Shows the Guildon button at the minimap."],
     function() return ns.db.minimapButton ~= false end,
     function(v) ns.db.minimapButton = v if ns.RefreshMinimapButton then ns.RefreshMinimapButton() end end)
+  Section(1, L["Tabs"])
+  p.profit = Toggle(1, L["Tab Profitable"], L["Recipes by profit per craft from auction prices. Off by default."],
+    function() return ns.db.showProfit == true end, function(v) ns.db.showProfit = v and true or false ns.RefreshTabs() end)
   -- officer ranks (GUILDON_PLAN.md decision 3): the guild master chooses, everyone else sees the choice
   Section(1, L["Ranks that may delete other members' wishes"])
   local noteY = colY[1] + 2
@@ -578,7 +582,7 @@ local function BuildOptions(p)
     for _, fn in ipairs(reflow) do fn() end
   end
   p.Refresh = function(self)
-    self.lock:Sync() self.fade:Sync() self.notify:Sync() self.tips:Sync() self.cod:Sync() self.mmb:Sync()
+    self.lock:Sync() self.fade:Sync() self.notify:Sync() self.tips:Sync() self.cod:Sync() self.mmb:Sync() self.profit:Sync()
     if self.days then self.days:Sync() end
     local names, n = ns.RankNames()
     local officer, set = ns.OfficerRanks()
@@ -646,8 +650,15 @@ local function Front()
   if panel and panel.Raise then panel:Raise() end
 end
 
+local function TabShown(key)
+  for _, t in ipairs(ns.TABS) do
+    if t.key == key then return not t.optional or ns.db[t.optional] == true end
+  end
+  return false
+end
+
 local function Select(key)
-  if not Page(key) then key = "overview" end
+  if not TabShown(key) or not Page(key) then key = "overview" end
   Front()
   current = key
   ns.db.tab = key
@@ -658,14 +669,26 @@ local function Select(key)
   PaintNav()
 end
 
--- the eight tabs share the width of the page
+-- the shown tabs share the width of the page (an optional tab that is off is hidden)
 function NavLayout()
-  local w = math.floor((ns.PageWidth() - 7 * NAV_GAP) / 8)
-  for i, b in ipairs(nav) do
+  local shown = {}
+  for _, b in ipairs(nav) do
+    if TabShown(b.key) then shown[#shown + 1] = b b:Show() else b:Hide() end
+  end
+  local n = math.max(1, #shown)
+  local w = math.floor((ns.PageWidth() - (n - 1) * NAV_GAP) / n)
+  for i, b in ipairs(shown) do
     b:SetWidth(w)
     b:ClearAllPoints()
     b:SetPoint("TOPLEFT", holder, "TOPLEFT", (i - 1) * (w + NAV_GAP), 0)
   end
+end
+
+-- switching an optional tab on or off (Options)
+function ns.RefreshTabs()
+  if not panel then return end
+  NavLayout()
+  if current and not TabShown(current) then Select("overview") end
 end
 
 local function NavButton(tab, i)

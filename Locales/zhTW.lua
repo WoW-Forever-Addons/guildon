@@ -376,3 +376,6 @@ L["Show the layer"] = "顯示分層"
 L["The layer (server copy of the zone) of each member in the tooltips and lists, compared with yours. Off by default."] = "在提示與清單中顯示每位成員的分層（區域的伺服器副本），並與你的比較。預設關閉。"
 L["%s is wanted by %s."] = "%s：%s正在尋找。" -- (30.10.2026) recipe drop in the chat (Extras.lua)
 L["%s found %s, the recipe you want."] = "%s找到了%s，就是你在找的配方。"
+L["Tabs"] = "分頁" -- (30.10.2026) Profitable optional (Window.lua)
+L["Tab Profitable"] = "有賺頭分頁"
+L["Recipes by profit per craft from auction prices. Off by default."] = "依拍賣價格計算每次製作利潤排序的配方。預設關閉。"

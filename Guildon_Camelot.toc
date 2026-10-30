@@ -3,7 +3,7 @@
 ## Notes: The guild's all-in-one helper: professions and recipes of the guild, wish list with orders, trade and mail help, shared auction prices and profitable crafts, guild members on the map.
 ## Notes-deDE: Der Gildenhelfer für alles: Berufe und Rezepte der Gilde, Wunschliste mit Aufträgen, Hilfe bei Handel und Post, geteilte Auktionspreise und profitable Rezepte, Gildenmitglieder auf der Karte.
 ## Author: DonCoohd
-## Version: 0.8.1
+## Version: 0.8.2
 ## X-Curse-Project-ID: 1770383
 ## Category: Guild
 ## Category-deDE: Gilde

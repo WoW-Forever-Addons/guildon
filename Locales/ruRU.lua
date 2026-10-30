@@ -377,3 +377,6 @@ L["Show the layer"] = "Показывать слой"
 L["The layer (server copy of the zone) of each member in the tooltips and lists, compared with yours. Off by default."] = "Слой (серверная копия зоны) каждого участника в подсказках и списках, в сравнении с вашим. По умолчанию выключено."
 L["%s is wanted by %s."] = "%s ищет: %s." -- (30.10.2026) recipe drop in the chat (Extras.lua)
 L["%s found %s, the recipe you want."] = "%s нашел %s, рецепт, который вы ищете."
+L["Tabs"] = "Вкладки" -- (30.10.2026) Profitable optional (Window.lua)
+L["Tab Profitable"] = "Вкладка «Выгодно»"
+L["Recipes by profit per craft from auction prices. Off by default."] = "Рецепты по прибыли за одно изготовление по ценам аукциона. По умолчанию выключено."

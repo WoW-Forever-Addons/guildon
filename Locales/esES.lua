@@ -377,3 +377,6 @@ L["Show the layer"] = "Mostrar la capa"
 L["The layer (server copy of the zone) of each member in the tooltips and lists, compared with yours. Off by default."] = "La capa (copia de la zona en el servidor) de cada miembro en descripciones y listas, comparada con la tuya. Desactivado por defecto."
 L["%s is wanted by %s."] = "%s lo busca %s." -- (30.10.2026) recipe drop in the chat (Extras.lua)
 L["%s found %s, the recipe you want."] = "%s ha encontrado %s, la receta que buscas."
+L["Tabs"] = "Pestañas" -- (30.10.2026) Profitable optional (Window.lua)
+L["Tab Profitable"] = "Pestaña Rentable"
+L["Recipes by profit per craft from auction prices. Off by default."] = "Recetas según la ganancia por fabricación con precios de subasta. Desactivado por defecto."

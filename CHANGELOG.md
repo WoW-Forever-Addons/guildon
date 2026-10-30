@@ -1,5 +1,8 @@
 # Changes
 
+## 0.8.2
+- The tab Profitable is now off by default, so the window stays focused on the guild. Switch it on in Options, section Tabs.
+
 ## 0.8.1
 - A recipe someone in the guild wants drops for you: a chat line names who wants it (click the name to whisper), and the ones who want it read who found it. Only for your own loot, in addition to the tooltip line.
 
@@ -25,7 +28,7 @@ Guildon is the guild's all-in-one helper for WoW Forever and WoW Classic Era. Ev
 - **Professions and recipes of the guild:** every member's professions with skill, all recipes of a profession with a mark who in the guild can craft them (green when someone is online), search, filters, groups by type (armour by slot, food by buff), reagents with what you have, whisper the crafter with the item link.
 - **Wish list:** wish a recipe instead of asking around: amount, "I bring the reagents", "I pay for the reagents" or "short of money", tip, note, for everyone or one crafter. Crafters see the wishes they can craft, accept, mark crafted and sent; you mark it received. Wishes for gathered goods reach the guild's gatherers. Officers may delete wishes; the guild master chooses which ranks count as officers.
 - **Trade and mail:** a bar below the trade window and the mailbox puts in the reagents or the goods of an order, one stack per click, fills in the letter and cash on delivery. You accept the trade and send the letter yourself.
-- **Prices and profitable crafts:** prices from Auctionator, Auctioneer or aux are shared with the guild (the newest scan counts, odd prices are marked); without an AH addon a short scan at the auction house. The tab Profitable lists recipes by profit per craft.
+- **Prices and profitable crafts:** prices from Auctionator, Auctioneer or aux are shared with the guild (the newest scan counts, odd prices are marked); without an AH addon a short scan at the auction house. The tab Profitable lists recipes by profit per craft (off by default, switch it on in the options).
 - **Map:** members with Guildon on the world map and the minimap, a dot in class colour with the level. Share your position with the guild, only with your group, or not at all; hidden in dungeons and when flagged for PvP.
 - **And more:** guild cooldowns (transmute, Mooncloth, Salt Shaker), "recipe wanted" with tooltip lines on recipe items, shopping lists, a note when a crafter for your wish comes online, alts linked, member tooltips with professions, the guild emblem, a thanks counter, Questdon's arrow to a member, "crafted in the guild by" in item tooltips, an export of your professions for the guild website (`/gn export`).
 - **Try it alone:** `/gn demo` shows an example guild (only on your screen).
