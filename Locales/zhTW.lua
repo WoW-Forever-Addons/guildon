@@ -374,3 +374,5 @@ L["How see-through the guild pins on the world map and the minimap are. 100 % is
 L["%dx"] = "%dx"
 L["Show the layer"] = "顯示分層"
 L["The layer (server copy of the zone) of each member in the tooltips and lists, compared with yours. Off by default."] = "在提示與清單中顯示每位成員的分層（區域的伺服器副本），並與你的比較。預設關閉。"
+L["%s is wanted by %s."] = "%s：%s正在尋找。" -- (30.10.2026) recipe drop in the chat (Extras.lua)
+L["%s found %s, the recipe you want."] = "%s找到了%s，就是你在找的配方。"

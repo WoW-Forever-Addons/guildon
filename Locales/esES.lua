@@ -375,3 +375,5 @@ L["How see-through the guild pins on the world map and the minimap are. 100 % is
 L["%dx"] = "%dx"
 L["Show the layer"] = "Mostrar la capa"
 L["The layer (server copy of the zone) of each member in the tooltips and lists, compared with yours. Off by default."] = "La capa (copia de la zona en el servidor) de cada miembro en descripciones y listas, comparada con la tuya. Desactivado por defecto."
+L["%s is wanted by %s."] = "%s lo busca %s." -- (30.10.2026) recipe drop in the chat (Extras.lua)
+L["%s found %s, the recipe you want."] = "%s ha encontrado %s, la receta que buscas."

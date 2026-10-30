@@ -1,5 +1,8 @@
 # Changes
 
+## 0.8.1
+- A recipe someone in the guild wants drops for you: a chat line names who wants it (click the name to whisper), and the ones who want it read who found it. Only for your own loot, in addition to the tooltip line.
+
 ## 0.8.0
 - About 440 more WoW Forever recipes: the new Forever recipes from the game client data and the specialisation recipes (Armorsmith, Weaponsmith, Dragonscale, Elemental, Tribal, Gnomish, Goblin).
 - Recipes the game shows that Guildon's data lacks (also ones you have not learned yet, the WoW Forever profession window lists them all) now appear in the recipe book with their reagents, and recipes known without reagents take them from the game. New command /gn recipes shows them as text to send to the authors.

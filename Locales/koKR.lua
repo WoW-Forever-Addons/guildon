@@ -374,3 +374,5 @@ L["How see-through the guild pins on the world map and the minimap are. 100 % is
 L["%dx"] = "%dx"
 L["Show the layer"] = "레이어 표시"
 L["The layer (server copy of the zone) of each member in the tooltips and lists, compared with yours. Off by default."] = "각 길드원의 레이어(지역의 서버 사본)를 툴팁과 목록에 표시하고 내 레이어와 비교합니다. 기본값은 꺼짐입니다."
+L["%s is wanted by %s."] = "%s: %s님이 구하고 있습니다." -- (30.10.2026) recipe drop in the chat (Extras.lua)
+L["%s found %s, the recipe you want."] = "%s님이 당신이 찾던 제조법 %s을(를) 찾았습니다."

@@ -421,6 +421,64 @@ function ns.ItemTooltipLines(item)
   return lines
 end
 
+-- (30.10.2026, Daniel: "die Meldung kommt nur, wenn es droppt", "zusätzlich zum Tooltip") a recipe someone in the guild
+-- wants drops for you: a chat line names who wants it (a click on the name whispers), and the guild hears "R:<item>",
+-- so the ones who want it read who found it. Only your own loot (the game's "You receive loot" lines), not quest
+-- rewards, purchases or crafting.
+function ns.RecipeSpellForItem(item)
+  Lookups()
+  return item and byRecipeItem[item] or nil
+end
+local function PlayerLink(full)
+  return "|Hplayer:" .. full .. "|h[" .. ns.ShortName(full) .. "]|h"
+end
+local lootPatterns
+local function LootPatterns()
+  if lootPatterns then return lootPatterns end
+  local list = {}
+  for _, g in ipairs({ "LOOT_ITEM_SELF_MULTIPLE", "LOOT_ITEM_SELF" }) do -- the longer one first ("...x3.")
+    local f = rawget(_G, g)
+    if type(f) == "string" then
+      local p = "^" .. f:gsub("[%(%)%.%+%-%*%?%[%]%^%$]", "%%%0"):gsub("%%s", "(.+)"):gsub("%%d", "%%d+") .. "$"
+      list[#list + 1] = p
+    end
+  end
+  if #list > 0 then lootPatterns = list end -- kept once the game's texts are there
+  return list
+end
+-- the item of an own loot line, or nil
+function ns.OwnLootItem(text)
+  if type(text) ~= "string" then return nil end
+  for _, p in ipairs(LootPatterns()) do
+    local link = text:match(p)
+    if link then return tonumber(link:match("|Hitem:(%d+)")) end
+  end
+  return nil
+end
+function ns.OnRecipeDrop(item)
+  local spell = ns.RecipeSpellForItem(item)
+  if not spell then return false end
+  local me, others = ns.MyName(), {}
+  for _, o in ipairs(ns.WantedBy(spell)) do if o ~= me then others[#others + 1] = PlayerLink(o) end end
+  if #others == 0 then return false end
+  ns.Print(L["%s is wanted by %s."]:format(ns.ItemName(item) or ("#" .. item), table.concat(others, ", ")))
+  ns.Send("R:" .. ns.B36(item), "GUILD")
+  return true
+end
+ns.On("CHAT_MSG_LOOT", function(_, text)
+  local item = ns.OwnLootItem(text)
+  if item then ns.OnRecipeDrop(item) end
+end)
+-- a member found a recipe: those who want it read it
+ns.MSG = ns.MSG or {}
+ns.MSG.R = function(sender, rest, chat)
+  if chat ~= "GUILD" then return end
+  local item = rest and rest:match("^(%w+)$") and ns.UnB36(rest)
+  local spell = item and ns.RecipeSpellForItem(item)
+  if not (spell and ns.IsWanted(spell)) then return end
+  ns.Print(L["%s found %s, the recipe you want."]:format(PlayerLink(sender), ns.ItemName(item) or ("#" .. item)))
+end
+
 local function OnTooltip(tooltip, data)
   if not tooltip or not tooltip.AddLine or type(data) ~= "table" then return end
   local id = ns.Num(data.id)
