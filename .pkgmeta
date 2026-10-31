@@ -2,6 +2,8 @@ package-as: Guildon
 
 required-dependencies:
   - donmap
+
+optional-dependencies:
   - guildon-crafts
 
 manual-changelog:
