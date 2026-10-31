@@ -1,5 +1,8 @@
 # Changes
 
+## 0.9.3
+- **Shield pin:** the black rim of the shield is now equally thick all around, also on the slanted sides down to the tip.
+
 ## 0.9.2
 - **Guild crest on the shield pin:** the crest now sits on a smaller shield in your guild's colour instead of a square, so the class colour stays a closed ring around it and the crest is in the middle.
 
