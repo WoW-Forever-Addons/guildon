@@ -141,12 +141,17 @@ function ns.ClassHex(classFile)
   return ns.Style.Hex("textPrimary")
 end
 
+-- (31.10.2026, LEISTUNG_PRUEFUNG 21) a big guild fires GUILD_ROSTER_UPDATE often: rebuilt at most every ROSTER_SLOW
+-- seconds while the window is closed, every half second while it is open and before the first roster
+local ROSTER_SLOW = 3
 local function RosterChanged()
   if rebuildPending then return end
   rebuildPending = true
-  ns.After(0.5, function()
+  local open = ns.WindowOpen and ns.WindowOpen()
+  ns.After((open or #members == 0) and 0.5 or ROSTER_SLOW, function()
     rebuildPending = false
     Rebuild()
+    if ns.PruneGone then ns.SafeCall("prune", ns.PruneGone) end
     if ns.OnRosterChanged then ns.OnRosterChanged() end
   end)
 end

@@ -1,17 +1,21 @@
 ## Interface: 11509
-## Title: |cff3fa9f5Guil|rdon
-## Notes: The guild's all-in-one helper for Classic Era: professions and recipes of the guild, wish list with orders, trade and mail help, shared auction prices and profitable crafts, guild members on the map.
-## Notes-deDE: Der Gildenhelfer für alles auf Classic Era: Berufe und Rezepte der Gilde, Wunschliste mit Aufträgen, Hilfe bei Handel und Post, geteilte Auktionspreise und profitable Rezepte, Gildenmitglieder auf der Karte.
+## Title: |cff3fa9f5Guil|rdon: Map & Members
+## Notes: Part of Guildon for Classic Era: guild members on the map, member list with classes and alts, arrow to a member. Needs Guildon: Crafts & Recipes.
+## Notes-deDE: Teil von Guildon auf Classic Era: Gildenmitglieder auf der Karte, Mitgliederliste mit Klassen und Twinks, Pfeil zu einem Mitglied. Braucht Guildon: Crafts & Recipes.
 ## Author: DonCoohd
-## Version: 0.8.2
+## Version: 0.9.0
 ## X-Curse-Project-ID: 1770383
 ## Category: Guild
 ## Category-deDE: Gilde
 ## IconTexture: Interface\Icons\INV_Misc_GroupNeedMore
 ## SavedVariables: GuildonDB
 ## AddonCompartmentFunc: Guildon_OnAddonCompartmentClick
-## X-License: Code MIT License, Copyright (c) 2026 DonCoohd (LICENSE.txt). DataEra/Recipes.lua: CMaNGOS classic-db data and All The Things profession lists (MIT), GPL v3 (see DataEra/Recipes-LICENSE-GPLv3.txt).
+## X-License: Code MIT License, Copyright (c) 2026 DonCoohd (LICENSE.txt). Libs/LibStub: public domain.
+## Dependencies: DonMap, Guildon_Crafts
 
+Libs\LibStub\LibStub.lua
+Libs\DonCore\DonCore.lua
+Libs\DonCore\Style.lua
 Locales\enUS.lua
 Locales\deDE.lua
 Locales\frFR.lua
@@ -23,24 +27,16 @@ Locales\koKR.lua
 Locales\zhTW.lua
 Classic.lua
 Core.lua
-Style.lua
-Theme.lua
-Guild.lua
-Comm.lua
-DataEra\Recipes.lua
-Professions.lua
-Wishes.lua
-Prices.lua
+Shared\Base.lua
+Shared\Theme.lua
+Shared\Guild.lua
+Shared\Comm.lua
 Demo.lua
-Kit.lua
-List.lua
-Window.lua
-RecipeBook.lua
-Export.lua
-WishList.lua
-Profit.lua
+Shared\Kit.lua
+Shared\List.lua
+Shared\Window.lua
+Pages.lua
 MapTab.lua
-Trade.lua
 Map.lua
 Extras.lua
-MinimapButton.lua
+Shared\Launcher.lua

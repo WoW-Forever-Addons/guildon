@@ -6,14 +6,20 @@ local Style = ns.Style
 -- Map (GUILDON_PLAN.md step 6): guild members with Guildon on the world map and the minimap, a dot in class colour
 -- with the level. The game does not give out where guild members are, so every Guildon sends its own position:
 --   P:<map>:<x>:<y>:<level>:<class>   x, y in ten-thousandths of the map; "P:0" = hidden now (instance, switched off)
---   W                                 "I show positions" (every 60 s while the world map is open or minimap dots are on)
--- Positions go out only while someone watches, at most every 4 s while moving, every 30 s standing; never in instances.
+--   W                                 "I show positions": the world map is open (every 60 s while it is)
+--   W:m:<map>:<x>:<y>                 "I show minimap dots here" (every 120 s, and after MINI_MOVE yards)
+-- Positions go out only while someone watches, at most every 4 s while moving, every 60 s standing; never in instances.
+-- (31.10.2026, LEISTUNG_PRUEFUNG A2) A minimap watcher only gets positions from members within MINI_RANGE yards of him;
+-- an older Guildon reads every W as "show positions", and a plain W (older Guildon) still means everyone sends.
 -- Privacy (decision 2: on by default): off, the guild, or only the own group; hidden while flagged for PvP (default).
 ---------------------------------------------------------------------------
-local SEND_MOVING, SEND_STILL, WATCH_EVERY, WATCH_KEEP, POS_KEEP = 4, 30, 60, 150, 90
+-- (31.10.2026) standing 60 s (was 30); POS_KEEP 150 (was 90; an older Guildon keeps 90, still above 60)
+local SEND_MOVING, SEND_STILL, WATCH_EVERY, WATCH_KEEP, POS_KEEP = 4, 60, 60, 150, 150
+local MINI_EVERY, MINI_MOVE, MINI_RANGE = 120, 400, 800 -- yards; range = minimap reach plus how far he may walk between two W
 local MOVE_MIN = 0.002
 local positions = {}   -- full name -> { map, x, y, level, class, t }
-local watchers = {}    -- full name -> time of the last W
+local watchers = {}    -- full name -> { t = time of the last W, c, n, w = his world position (nil: the world map, all) }
+local version = 0      -- (31.10.2026, A1) counts every change of the positions; the pins are built anew only then
 local last = { t = -100, map = nil, x = nil, y = nil, hidden = false, watchSent = -100 }
 
 local function Mult(v) return math.max(0.25, math.min(2, tonumber(v) or 1)) end
@@ -71,23 +77,58 @@ local function Channel()
   return ns.InGuild() and "GUILD" or nil
 end
 
+local function WorldNow()
+  local map, x, y = ns.PlayerMapPos()
+  if not map or not (DonMapAPI and DonMapAPI.WorldPos) then return nil end
+  return DonMapAPI.WorldPos(map, x, y)
+end
+
+-- someone shows positions: a world map anywhere, or minimap dots near enough
 local function Watched()
   local now = GetTime()
-  for name, t in pairs(watchers) do
-    if now - t > WATCH_KEEP then watchers[name] = nil else return true end
+  local c0, n0, w0
+  for name, v in pairs(watchers) do
+    if now - v.t > WATCH_KEEP then watchers[name] = nil
+    elseif not v.c then return true
+    else
+      if c0 == nil then c0, n0, w0 = WorldNow() c0 = c0 or false end
+      if c0 and v.c == c0 and (v.n - n0) ^ 2 + (v.w - w0) ^ 2 < MINI_RANGE ^ 2 then return true end
+    end
   end
   return false
+end
+
+-- tell the guild what this client shows: a plain W while the world map is open, W:m with the place for minimap dots
+local function SendWatch(now, db)
+  if not ns.InGuild() then return end
+  if db.mapWorld and WorldMapFrame and WorldMapFrame.IsShown and WorldMapFrame:IsShown() then
+    if last.watchKind ~= "world" or now - last.watchSent >= WATCH_EVERY then
+      last.watchKind, last.watchSent = "world", now
+      ns.Send("W:", "GUILD")
+    end
+    return
+  end
+  if not db.mapMinimap or (InInstance() and not db.mapInstance) then last.watchKind = nil return end
+  local map, x, y = ns.PlayerMapPos()
+  local c, n, w
+  if map and DonMapAPI and DonMapAPI.WorldPos then c, n, w = DonMapAPI.WorldPos(map, x, y) end
+  if not (c and n and w) then -- no place known: the old way, everyone sends
+    if now - last.watchSent >= WATCH_EVERY then last.watchKind, last.watchSent = "all", now ns.Send("W:", "GUILD") end
+    return
+  end
+  local moved = last.wc ~= c or (n - last.wn) ^ 2 + (w - last.ww) ^ 2 > MINI_MOVE ^ 2
+  local switched = last.watchKind ~= "mini" and now - last.watchSent >= 10
+  if moved or switched or now - last.watchSent >= MINI_EVERY then
+    last.watchKind, last.watchSent, last.wc, last.wn, last.ww = "mini", now, c, n, w
+    ns.Send(("W:m:%d:%d:%d"):format(map, math.floor(x * 10000 + 0.5), math.floor(y * 10000 + 0.5)), "GUILD")
+  end
 end
 
 local function Tick()
   local now = GetTime()
   local db = DB()
   -- watching: tell the others while the world map is open or minimap dots are on
-  local want = (db.mapMinimap or (WorldMapFrame and WorldMapFrame.IsShown and WorldMapFrame:IsShown())) and ns.InGuild()
-  if want and now - last.watchSent >= WATCH_EVERY then
-    last.watchSent = now
-    ns.Send("W:", "GUILD")
-  end
+  SendWatch(now, db)
   local chat = Channel()
   if not chat or not Watched() then return end
   if Hidden() then
@@ -111,23 +152,45 @@ local function Tick()
     ns.Num(ns.Call(UnitLevel, "player")) or 0, CLASS_IDX[cls or ""] or 0, ns.MyLayer and ns.MyLayer() or 0), chat)
 end
 
-ns.MSG.W = function(sender) watchers[sender] = GetTime() end
+ns.MSG.W = function(sender, rest)
+  local v = watchers[sender]
+  if not v then v = {} watchers[sender] = v end
+  v.t, v.c, v.n, v.w = GetTime(), nil, nil, nil
+  local map, x, y = (rest or ""):match("^m:(%d+):(%d+):(%d+)$")
+  if map and DonMapAPI and DonMapAPI.WorldPos then -- an unknown place counts as the world map: everyone sends
+    v.c, v.n, v.w = DonMapAPI.WorldPos(tonumber(map), tonumber(x) / 10000, tonumber(y) / 10000)
+    if not (v.n and v.w) then v.c = nil end
+  end
+end
+-- (31.10.2026, A1) one table per member, filled anew; the version only moves when something on the pin changed
 ns.MSG.P = function(sender, rest)
-  if rest == "0" then positions[sender] = nil return end
+  if rest == "0" then
+    if positions[sender] then positions[sender] = nil version = version + 1 end
+    return
+  end
   local map, x, y, lv, cls, layer = rest:match("^(%d+):(%d+):(%d+):(%d+):(%d+):?(%d*):?%d*:?%d*$")
   map, x, y, layer = tonumber(map), tonumber(x), tonumber(y), tonumber(layer)
   if not map or x > 10000 or y > 10000 then return end
-  positions[sender] = { map = map, x = x / 10000, y = y / 10000, level = tonumber(lv), class = CLASSES[tonumber(cls)] or "", t = GetTime(),
-    layer = layer and layer > 0 and layer or nil }
+  x, y, lv, cls, layer = x / 10000, y / 10000, tonumber(lv), CLASSES[tonumber(cls)] or "", layer and layer > 0 and layer or nil
+  local p = positions[sender]
+  if not p then p = {} positions[sender] = p end
+  if p.map ~= map or p.x ~= x or p.y ~= y or p.level ~= lv or p.class ~= cls or p.layer ~= layer then version = version + 1 end
+  p.map, p.x, p.y, p.level, p.class, p.layer, p.t = map, x, y, lv, cls, layer, GetTime()
+end
+
+-- old positions and those of members who left go; once a second, without new tables
+local function Expire()
+  local now = GetTime()
+  for name, p in pairs(positions) do
+    if now - p.t > POS_KEEP or not ns.IsMember(name) then positions[name] = nil version = version + 1 end
+  end
 end
 
 -- members on the map (demo members of /gn demo included), old positions dropped
 function ns.Positions()
-  local now = GetTime()
+  Expire()
   local out = {}
-  for name, p in pairs(positions) do
-    if now - p.t > POS_KEEP or not ns.IsMember(name) then positions[name] = nil else out[name] = p end
-  end
+  for name, p in pairs(positions) do out[name] = p end
   for name, p in pairs(ns.DemoPositions and ns.DemoPositions() or {}) do out[name] = p end
   return out
 end
@@ -135,32 +198,13 @@ end
 function ns.MapState() return positions, watchers, last end -- (tests)
 
 ---------------------------------------------------------------------------
--- Position of a member on another map (the shown world map, the player's zone for the minimap)
+-- Position of a member on another map (the shown world map): DonMap's geometry (DONCORE_PLAN.md "DonMap", 30.10.2026)
 ---------------------------------------------------------------------------
-local function WorldPos(map, x, y)
-  if not (C_Map and C_Map.GetWorldPosFromMapPos and CreateVector2D) then return nil end
-  local ok, continent, pos = pcall(C_Map.GetWorldPosFromMapPos, map, CreateVector2D(x, y))
-  if not ok or not ns.Num(continent) or type(pos) ~= "table" or not pos.GetXY then return nil end
-  local ok2, a, b = pcall(pos.GetXY, pos)
-  if not ok2 or not (ns.Num(a) and ns.Num(b)) then return nil end
-  return continent, a, b, pos
-end
-ns.MemberWorldPos = WorldPos
-
 function ns.PosOnMap(p, shown)
-  if p.map == shown then return p.x, p.y end
-  local continent, _, _, pos = WorldPos(p.map, p.x, p.y)
-  if not continent or not (C_Map and C_Map.GetMapPosFromWorldPos) then return nil end
-  local ok, _, mp = pcall(C_Map.GetMapPosFromWorldPos, continent, pos, shown)
-  if not ok or type(mp) ~= "table" or not mp.GetXY then return nil end
-  local ok2, x, y = pcall(mp.GetXY, mp)
-  if not ok2 or not (ns.Num(x) and ns.Num(y)) or x < 0 or x > 1 or y < 0 or y > 1 then return nil end
-  return x, y
+  if not DonMapAPI then return nil end
+  return DonMapAPI.PosOnMap(p.map, p.x, p.y, shown)
 end
 
----------------------------------------------------------------------------
--- Pins (own buttons): on the world map's canvas and on the minimap
----------------------------------------------------------------------------
 ---------------------------------------------------------------------------
 -- Layer (Daniel 25.10.): the zone part of a creature's GUID tells the layer (Creature-0-<server>-<instance>-<zoneUID>-
 -- <npc>-<spawn>), read from target, mouse-over and name plates; kept per map, sent with the position. Layers are
@@ -255,7 +299,7 @@ ns.PIN_LOOK = {
   near = { world = 18, mini = 14 },                               -- pixels: closer than this is one group
 }
 
-ns.PIN_LEVEL = 2012 -- world map: above the tiles, below Questie (2015 lines, 2016 icons); see UpdateWorldPins
+ns.PIN_LEVEL = 2012 -- world map: above the tiles, below Questie (2015 lines, 2016 icons); DonMap's layer 2 (Layers.lua)
 
 local function ColoredName(name, p)
   return "|c" .. ns.ClassHex(p.class) .. ns.ShortName(name) .. "|r"
@@ -341,7 +385,7 @@ local function PickRow(f, i)
       if ns.ArrowTo and ns.ArrowTo(name) then HidePicker() end
     else
       if IsShiftKeyDown and IsShiftKeyDown() then ns.InviteMember(name)
-      elseif ns.WhisperCrafter then ns.WhisperCrafter(name) end
+      elseif ns.WhisperMember then ns.WhisperMember(name) end
       HidePicker()
     end
   end)
@@ -365,11 +409,12 @@ function ns.ShowPicker(pin)
   end
   for i = n + 1, #f.rows do f.rows[i]:Hide() end
   local hint = L["Click: whisper"] .. "\n" .. L["Shift-click: invite to your group"]
-  if QuestdonAPI then hint = hint .. "\n" .. L["Right-click: Questdon's arrow to this member"] end
+  local arrow = ns.CanArrow and ns.CanArrow()
+  if arrow then hint = hint .. "\n" .. L["Right-click: arrow to this member"] end
   f.hint:ClearAllPoints()
   f.hint:SetPoint("TOPLEFT", f, "TOPLEFT", 10, -30 - n * PICK_ROW - 6)
   f.hint:SetText(hint)
-  f:SetHeight(30 + n * PICK_ROW + 6 + (QuestdonAPI and 39 or 26) + 8)
+  f:SetHeight(30 + n * PICK_ROW + 6 + (arrow and 39 or 26) + 8)
   f:ClearAllPoints()
   f:SetPoint("TOPLEFT", pin, "BOTTOMRIGHT", 2, 2)
   f:Show()
@@ -420,7 +465,7 @@ local function NewPin(parent, size)
     local m = list and list[1]
     if not m or m.name == ns.MyName() then return end
     if IsShiftKeyDown and IsShiftKeyDown() then ns.InviteMember(m.name) -- Shift: invite to the group
-    elseif ns.WhisperCrafter then ns.WhisperCrafter(m.name) end
+    elseif ns.WhisperMember then ns.WhisperMember(m.name) end
   end)
   return b
 end
@@ -534,32 +579,48 @@ function ns.PaintPreview(b, members, size, groupSize, style)
   Paint(b, members, size, groupSize, { style = style })
 end
 
--- members closer than "near" pixels become one group; input { { name, p, x, y } } in pixels
-function ns.GroupPins(points, near)
-  table.sort(points, function(a, b) return a.name < b.name end)
-  local groups = {}
-  for _, pt in ipairs(points) do
-    local hit
-    for _, g in ipairs(groups) do
-      if (g.x - pt.x) ^ 2 + (g.y - pt.y) ^ 2 <= near * near then hit = g break end
-    end
-    if hit then
-      table.insert(hit.members, pt)
-      local n = #hit.members
-      hit.x, hit.y = hit.x + (pt.x - hit.x) / n, hit.y + (pt.y - hit.y) / n
-    else
-      groups[#groups + 1] = { x = pt.x, y = pt.y, members = { pt } }
-    end
-  end
-  return groups
+---------------------------------------------------------------------------
+-- (DonMap M1, 30.10.2026) DonMap draws the pins: Guildon registers the source "guildon" with its own pin (NewPin) and
+-- look (Paint), its sizes and grouping distance (PIN_LOOK times the player's pin size), and hands over the positions.
+-- DonMap places them on the world map and the minimap, groups them, keeps them on whole pixels and on their level.
+-- Sending, privacy, tooltip, pick list and the look stay here.
+---------------------------------------------------------------------------
+local src
+
+local function Source()
+  if src or not DonMapAPI then return src end
+  src = DonMapAPI.Register("guildon", {
+    title = "Guildon",
+    layer = 2, -- world map 2012 (ns.PIN_LEVEL)
+    world = function() return DB().mapWorld end,
+    -- (Daniel 26.10.) dungeons and raids: minimap off by default, on with the switch
+    minimap = function() local db = DB() return db.mapMinimap and not (InInstance() and not db.mapInstance) end,
+    -- (Daniel 26.10.) everyone sets the pin size himself, the groups grow with it
+    size = function(where)
+      local look, db = ns.PIN_LOOK, DB()
+      if where == "world" then local m = Mult(db.mapWorldScale) return look.world * m, look.groupWorld * m end
+      local m = Mult(db.mapMiniScale)
+      return look.mini * m, look.groupMini * m
+    end,
+    group = function(where)
+      local db = DB()
+      if where == "world" then return ns.PIN_LOOK.near.world * Mult(db.mapWorldScale) end
+      return ns.PIN_LOOK.near.mini * Mult(db.mapMiniScale)
+    end,
+    newPin = function(parent, size) return NewPin(parent, size) end,
+    paint = function(b, members, size, groupSize) Paint(b, members, size, groupSize) end,
+  })
+  return src
 end
 
-local worldPins, miniPins = {}, {}
-
-local function Canvas()
-  local f = WorldMapFrame
-  local sc = f and f.ScrollContainer
-  return sc and sc.Child, sc
+-- the members on the map as DonMap points (the member's own data stays on the point: name, p); not myself on the minimap
+local function Points()
+  local list, me = {}, ns.MyName()
+  for name, p in pairs(ns.Positions()) do
+    list[#list + 1] = { mapID = p.map, x = p.x, y = p.y, key = name, name = name, p = p, minimap = name ~= me,
+      sig = (p.level or 0) .. (p.class or "") .. (p.layer or "") }
+  end
+  return list
 end
 
 -- what the last look at the open world map found, for /gn diag ("members on the minimap but not on the world map")
@@ -573,201 +634,95 @@ local function Ask(f, method)
   end
 end
 
--- (27.10.) /gn diag: frame levels of the pins of Questie (HereBeDragons) and GatherMate2 on the open world map and on the
--- minimap, next to ours. Read only.
-local function Range(lo, hi, n, lv)
-  if not lv then return lo, hi, n end
-  return (lo and math.min(lo, lv) or lv), (hi and math.max(hi, lv) or lv), n + 1
-end
-function ns.ForeignPinLevels()
-  local out = {}
-  local wm = WorldMapFrame
-  if wm and wm.EnumeratePinsByTemplate and wm.IsShown and wm:IsShown() then
-    for _, tpl in ipairs({ "HereBeDragonsPinsTemplateQuestie", "HereBeDragonsPinsTemplate", "GatherMate2WorldMapPinTemplate" }) do
-      local lo, hi, n, clo, chi, cn = nil, nil, 0, nil, nil, 0
-      local ok = pcall(function()
-        for pin in wm:EnumeratePinsByTemplate(tpl) do
-          lo, hi, n = Range(lo, hi, n, Ask(pin, "GetFrameLevel"))
-          if pin.icon then clo, chi, cn = Range(clo, chi, cn, Ask(pin.icon, "GetFrameLevel")) end
-        end
-      end)
-      if ok and n > 0 then
-        out[#out + 1] = ("world %s: %d pins, level %s to %s%s"):format(tpl, n, tostring(lo), tostring(hi),
-          cn > 0 and (", icons %s to %s"):format(tostring(clo), tostring(chi)) or "")
-      end
-    end
-  end
-  if Minimap and Minimap.GetChildren then
-    local lo, hi, n, glo, ghi, gn = nil, nil, 0, nil, nil, 0
-    for _, c in ipairs({ Minimap:GetChildren() }) do
-      local name = Ask(c, "GetName")
-      if type(name) == "string" and name:find("^GatherMatePin") and Ask(c, "IsShown") then
-        glo, ghi, gn = Range(glo, ghi, gn, Ask(c, "GetFrameLevel"))
-      elseif c.data or c.miniMapIcon then -- Questie's icon frames carry their data
-        if Ask(c, "IsShown") then lo, hi, n = Range(lo, hi, n, Ask(c, "GetFrameLevel")) end
-      end
-    end
-    local mine = miniPins and miniPins[1] and Ask(miniPins[1], "GetFrameLevel")
-    out[#out + 1] = ("minimap level %s, ours %s, Questie %d (%s to %s), GatherMate %d (%s to %s)"):format(
-      tostring(Ask(Minimap, "GetFrameLevel")), tostring(mine), n, tostring(lo), tostring(hi), gn, tostring(glo), tostring(ghi))
-  end
-  return out
+-- (27.10.) /gn diag: frame levels of the pins of Questie and GatherMate2 next to ours, and the world map's own levels
+function ns.ForeignPinLevels() return DonMapAPI and DonMapAPI.ForeignPinLevels() or {} end
+function ns.MapLevels() if DonMapAPI then return DonMapAPI.MapLevels() end end
+
+-- (31.10.2026) filled in place while the world map is open (was a new table five times a second)
+local function NoteWorld(s, n)
+  local info = s:Info("world")
+  if not info then return end
+  local ws = worldState or {}
+  worldState = ws
+  local first = s:Pins("world")[1]
+  ws.map, ws.mine, ws.w, ws.h, ws.scale, ws.have, ws.onMap = info.map, ns.PlayerMapPos(), info.w, info.h, info.scale, info.have, info.onMap
+  ws.pins, ws.vis, ws.alpha = n or s.n.world, first and Ask(first, "IsVisible"), first and Ask(first, "GetEffectiveAlpha")
+  ws.size, ws.level, ws.canvasLevel = first and Ask(first, "GetWidth"), first and Ask(first, "GetFrameLevel"), info.canvasLevel
+  ws.expl, ws.poi = ns.MapLevels()
 end
 
--- (27.10., Daniel's /gn diag on Era: canvas level 3, Questie's icons 2021, GatherMate on the minimap at minimap + 5)
--- The world map hands out pin levels itself (its frame level manager); GatherMate and Questie's HereBeDragons frames use
--- the type PIN_FRAME_LEVEL_AREA_POI on the world map (GatherMate only uses the minimap).
-local function TypeLevel(mgr, t)
-  if not mgr or type(mgr.GetValidFrameLevel) ~= "function" then return nil end
-  local ok, v = pcall(mgr.GetValidFrameLevel, mgr, t)
-  return ok and type(v) == "number" and v or nil
-end
-function ns.MapLevels()
-  local wm = WorldMapFrame
-  local mgr = wm and type(wm.GetPinFrameLevelsManager) == "function" and select(2, pcall(wm.GetPinFrameLevelsManager, wm)) or nil
-  if type(mgr) ~= "table" then mgr = nil end
-  return TypeLevel(mgr, "PIN_FRAME_LEVEL_MAP_EXPLORATION"), TypeLevel(mgr, "PIN_FRAME_LEVEL_AREA_POI")
-end
--- (27.10., Daniel: "gathermate nimmt die weltkarte nicht, so passt das schon gut") the tested fixed level stays;
--- the manager's levels are only shown in /gn diag
-function ns.WorldPinLevel(canvasLevel)
-  return math.max(ns.PIN_LEVEL, (canvasLevel or 0) + 1)
-end
-
-function ns.UpdateWorldPins()
+-- (31.10.2026, A1) what the pins were last built from: the positions' version and the look; the stamp is the points'
+-- signature for DonMap (version 3: no long string of all points)
+local built = { stamp = 0 }
+local function WorldShown()
   local db = DB()
+  return db.mapWorld and WorldMapFrame and WorldMapFrame.IsShown and WorldMapFrame:IsShown()
+end
+
+-- hand the points over when they or the look changed (the example guild's travellers always); true then
+local function Hand(s)
+  local style, alpha, demo = ns.PinStyle(), ns.PinAlpha(), ns.demo and true or false
+  if built.version == version and built.style == style and built.alpha == alpha and built.demo == demo and not demo then return false end
+  built.version, built.style, built.alpha, built.demo, built.stamp = version, style, alpha, demo, built.stamp + 1
   CrestNow()
-  local look = ns.PIN_LOOK
-  local canvas, sc = Canvas()
-  local shown = db.mapWorld and WorldMapFrame and WorldMapFrame.IsShown and WorldMapFrame:IsShown()
-  if not shown or not canvas then for _, b in ipairs(worldPins) do b:Hide() end HidePicker() return 0 end
-  local map = ns.Num(ns.Call(WorldMapFrame.GetMapID, WorldMapFrame))
-  local w, h = canvas:GetWidth() or 0, canvas:GetHeight() or 0
-  local scale = math.max(0.2, sc and sc.GetCanvasScale and ns.Num(ns.Call(sc.GetCanvasScale, sc)) or 1)
-  local ps = scale / Mult(db.mapWorldScale) -- (Daniel 26.10.) the player's own pin size, the groups grow with it
-  local n = 0
-  local have, onMap = 0, 0
-  if map and w > 0 then
-    local points = {}
-    for name, p in pairs(ns.Positions()) do
-      have = have + 1
-      local x, y = ns.PosOnMap(p, map)
-      if x then points[#points + 1] = { name = name, p = p, x = x * w, y = y * h } end
-    end
-    onMap = #points
-    -- whole screen pixels: the canvas is drawn at "scale", so a size or place of k / scale is k pixels on the screen
-    local function Px(v) return math.floor(v * scale + 0.5) / scale end
-    local sizeW, sizeG = Px(look.world / ps), Px(look.groupWorld / ps)
-    for _, g in ipairs(ns.GroupPins(points, look.near.world / ps)) do
-      n = n + 1
-      local b = worldPins[n] or NewPin(canvas, sizeW)
-      worldPins[n] = b
-      -- (27.10., Frankston: our pins hid Questie's and Gatherer's marks) above the map's tiles, below the other addons:
-      -- Questie puts its icons at the fixed level 2016 and up and its lines at 2015 (it counts the scroll container from
-      -- 2000); our pins sit just below at PIN_LEVEL, or one above the canvas if that is higher already. Before 27.10. canvas
-      -- plus 2000, which was above everything. To be checked in the game with /gn diag (Elwynn zone map).
-      local lv = Ask(canvas, "GetFrameLevel")
-      local want = ns.WorldPinLevel(lv)
-      if lv and b.lvl ~= want and b.SetFrameLevel then
-        b.lvl = want
-        if b.SetFixedFrameLevel then pcall(b.SetFixedFrameLevel, b, false) end
-        pcall(b.SetFrameLevel, b, want)
-        if b.SetFixedFrameLevel then pcall(b.SetFixedFrameLevel, b, true) end
-      end
-      Paint(b, g.members, sizeW, sizeG)
-      b:ClearAllPoints()
-      b:SetPoint("CENTER", canvas, "TOPLEFT", Px(g.x), -Px(g.y))
-      b:Show()
-    end
-  end
-  for i = n + 1, #worldPins do worldPins[i]:Hide() end
-  local first = worldPins[1]
-  local mine = ns.PlayerMapPos()
-  worldState = { map = map, mine = mine, w = w, h = h, scale = scale, have = have, onMap = onMap, pins = n,
-    vis = first and Ask(first, "IsVisible"), alpha = first and Ask(first, "GetEffectiveAlpha"), size = first and Ask(first, "GetWidth"),
-    level = first and Ask(first, "GetFrameLevel"), canvasLevel = Ask(canvas, "GetFrameLevel") }
-  worldState.expl, worldState.poi = ns.MapLevels()
+  if (DonMapAPI.version or 0) >= 3 then s:SetPoints(Points(), built.stamp) else s:SetPoints(Points()) end
+  return true
+end
+
+-- draw now, whatever changed (options, tests)
+function ns.UpdateWorldPins()
+  if not WorldShown() then HidePicker() end
+  local s = Source()
+  if not s then return 0 end
+  built.version = nil
+  Hand(s)
+  local n = s:Update("world")
+  if WorldShown() then NoteWorld(s, n) end
   return n
-end
-
-local function Facing()
-  local v
-  if C_CVar and C_CVar.GetCVar then v = ns.Call(C_CVar.GetCVar, "rotateMinimap") elseif GetCVar then v = ns.Call(GetCVar, "rotateMinimap") end
-  if v ~= "1" and v ~= 1 and v ~= true then return nil end
-  return ns.Num(ns.Call(GetPlayerFacing))
-end
-
-local DIAMETER = { [0] = 466 + 2 / 3, 400, 333 + 1 / 3, 266 + 2 / 3, 200, 133 + 1 / 3 }
-local function Radius()
-  if C_Minimap and C_Minimap.GetViewRadius then
-    local r = ns.Num(ns.Call(C_Minimap.GetViewRadius))
-    if r and r > 0 then return r end
-  end
-  local zoom = Minimap and ns.Num(ns.Call(Minimap.GetZoom, Minimap)) or 0
-  return DIAMETER[math.max(0, math.min(5, math.floor(zoom)))] / 2
 end
 
 function ns.UpdateMiniPins()
-  local db = DB()
-  CrestNow()
-  if not db.mapMinimap or not Minimap or (Minimap.IsVisible and not Minimap:IsVisible()) or (InInstance() and not db.mapInstance) then
-    for _, b in ipairs(miniPins) do b:Hide() end
-    return 0
-  end
-  local map, mx, my = ns.PlayerMapPos()
-  local c0, n0, w0 = nil, nil, nil
-  if map then c0, n0, w0 = WorldPos(map, mx, my) end
-  local n = 0
-  if c0 then
-    local radius = Radius()
-    local half = (Minimap:GetWidth() or 140) / 2
-    local facing = Facing()
-    local points = {}
-    for name, p in pairs(ns.Positions()) do
-      if name ~= ns.MyName() then
-        local c, pn, pw = WorldPos(p.map, p.x, p.y)
-        if c == c0 then
-          local dNorth, dEast = pn - n0, -(pw - w0)
-          local x, y = dEast, dNorth
-          if facing then
-            local cs, sn = math.cos(facing), math.sin(facing)
-            x, y = dEast * cs + dNorth * sn, -dEast * sn + dNorth * cs
-          end
-          x, y = x * half / radius, y * half / radius
-          if x * x + y * y <= (half - 4) ^ 2 then points[#points + 1] = { name = name, p = p, x = x, y = y } end
-        end
-      end
-    end
-    local look = ns.PIN_LOOK
-    local m = Mult(db.mapMiniScale) -- (Daniel 26.10.) the player's own pin size on the minimap
-    for _, g in ipairs(ns.GroupPins(points, look.near.mini * m)) do
-      n = n + 1
-      local sizeM, sizeMG = math.floor(look.mini * m + 0.5), math.floor(look.groupMini * m + 0.5)
-      local b = miniPins[n] or NewPin(Minimap, sizeM)
-      miniPins[n] = b
-      Paint(b, g.members, sizeM, sizeMG)
-      b:ClearAllPoints()
-      b:SetPoint("CENTER", Minimap, "CENTER", math.floor(g.x + 0.5), math.floor(g.y + 0.5))
-      b:Show()
-    end
-  end
-  for i = n + 1, #miniPins do miniPins[i]:Hide() end
-  return n
+  local s = Source()
+  if not s then return 0 end
+  built.version = nil
+  Hand(s)
+  return s:Update("minimap")
 end
 
-function ns.MapPins() return worldPins, miniPins end -- (tests)
+-- the clock: draws only when something changed; DonMap's own clock follows the map and the player
+local function RefreshPins()
+  local shown = WorldShown()
+  if not shown then HidePicker() end
+  local s = Source()
+  if not s then return end
+  if Hand(s) then
+    if (DonMapAPI.version or 0) >= 3 then s:Refresh() else s:Update() end
+  end
+  if shown then NoteWorld(s) end
+end
 
--- one frame of our own drives sending (1 s) and the pins (0.2 s)
+local NONE = {}
+function ns.MapPins() -- (tests)
+  local s = Source()
+  if not s then return NONE, NONE end
+  return s:Pins("world"), s:Pins("minimap")
+end
+
+-- one frame of our own drives sending and old positions (1 s) and the pins (0.5 s, only when something changed; was
+-- 0.2 s with a full rebuild, LEISTUNG_PRUEFUNG A1)
 local driver = CreateFrame("Frame")
 local acc, accSend = 0, 0
 driver:SetScript("OnUpdate", function(_, dt)
   if not ns.db then return end
   acc, accSend = acc + dt, accSend + dt
-  if accSend >= 1 then accSend = 0 ns.SafeCall("map send", Tick) end
-  if acc >= 0.2 then
+  if accSend >= 1 then
+    accSend = 0
+    ns.SafeCall("map send", Tick)
+    Expire()
+  end
+  if acc >= 0.5 then
     acc = 0
-    ns.SafeCall("world pins", ns.UpdateWorldPins)
-    ns.SafeCall("minimap pins", ns.UpdateMiniPins)
+    ns.SafeCall("map pins", RefreshPins)
   end
 end)
 
@@ -783,4 +738,4 @@ function ns.ShowOnMap(name)
   end
 end
 
-ns.OnInit(function() DB() end)
+ns.OnInit(function() DB() Source() end)

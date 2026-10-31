@@ -1,6 +1,4 @@
-This license covers Guildon's code. The recipe data in Data/Recipes.lua and DataEra/Recipes.lua is built from
-CMaNGOS classic-db (GPL v3) and All The Things (MIT) and is licensed under the GNU GPL v3, see
-Data/Recipes-LICENSE-GPLv3.txt and DataEra/Recipes-LICENSE-GPLv3.txt. The add-on as a whole is distributed under GPL v3.
+This license covers Guildon's code. Since 0.9.0 Guildon has no recipe data (it went to Guildon: Crafts & Recipes with the professions).
 
 MIT License
 

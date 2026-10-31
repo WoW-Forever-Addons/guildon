@@ -389,3 +389,99 @@ function UI.ClearField(e)
   if e.clear then e.clear:Hide() end
   if e.ClearFocus then e:ClearFocus() end
 end
+
+-- (31.10.2026, C3) out of RecipeBook.lua, so that Guildon keeps it without the recipe book
+
+-- A dropdown field: own frames (pattern of Dropdon's slot choice), closes on a choice, a second click or a click beside it.
+-- opts: get() -> key, options() -> { { key, label }, ... }, onPick(key), title (tooltip). Long lists open in columns.
+local MENU_ROW, MENU_MAX = 18, 18
+function UI.Dropdown(parent, w, opts)
+  local b = UI.FlatButton(parent, w, 22, "")
+  b.label:ClearAllPoints()
+  b.label:SetPoint("LEFT", b, "LEFT", 8, 0)
+  b.label:SetPoint("RIGHT", b, "RIGHT", -18, 0)
+  b.label:SetJustifyH("LEFT")
+  b.caret = b:CreateTexture(nil, "OVERLAY")
+  b.caret:SetSize(10, 10)
+  b.caret:SetPoint("RIGHT", b, "RIGHT", -6, 0)
+  b.caret:SetTexture("Interface\\Buttons\\Arrow-Down-Up")
+  b.caret:SetVertexColor(C.accent[1], C.accent[2], C.accent[3])
+  local catcher = CreateFrame("Button", nil, parent)
+  catcher:SetAllPoints(UIParent)
+  catcher:SetFrameStrata("DIALOG")
+  catcher:Hide()
+  local menu = CreateFrame("Frame", nil, parent)
+  menu:SetFrameStrata("DIALOG")
+  menu:SetFrameLevel((catcher:GetFrameLevel() or 1) + 5)
+  menu:EnableMouse(true)
+  menu:SetPoint("TOPLEFT", b, "BOTTOMLEFT", 0, -2)
+  local edge = menu:CreateTexture(nil, "BACKGROUND")
+  edge:SetAllPoints()
+  edge:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 0.8)
+  local fill = menu:CreateTexture(nil, "BORDER")
+  fill:SetPoint("TOPLEFT", 1, -1)
+  fill:SetPoint("BOTTOMRIGHT", -1, 1)
+  local low = Style.BOOK and Style.BOOK.cardLow or C.background
+  fill:SetColorTexture(low[1], low[2], low[3], 0.99)
+  menu:Hide()
+  menu.rows = {}
+  b.menu = menu
+  local function Close() menu:Hide() catcher:Hide() end
+  b.Close = Close
+  function b:Sync()
+    local cur = opts.get()
+    for _, o in ipairs(opts.options()) do if o[1] == cur then self.label:SetText(o[2]) return end end
+    self.label:SetText("")
+  end
+  local function Open()
+    local list, cur = opts.options(), opts.get()
+    local cols = math.max(1, math.ceil(#list / MENU_MAX))
+    local perCol = math.ceil(#list / cols)
+    local colW = math.max(w, 170)
+    menu:SetSize(cols * colW + 6, perCol * MENU_ROW + 6)
+    for i, o in ipairs(list) do
+      local r = menu.rows[i]
+      if not r then
+        r = CreateFrame("Button", nil, menu)
+        r:SetHeight(MENU_ROW)
+        r.active = r:CreateTexture(nil, "BACKGROUND")
+        r.active:SetAllPoints()
+        r.active:SetColorTexture(C.rowActive[1], C.rowActive[2], C.rowActive[3], C.rowActive[4] or 1)
+        r.hover = r:CreateTexture(nil, "BORDER")
+        r.hover:SetAllPoints()
+        r.hover:SetColorTexture(C.rowHover[1], C.rowHover[2], C.rowHover[3], C.rowHover[4] or 1)
+        r.hover:Hide()
+        r.text = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        r.text:SetPoint("LEFT", r, "LEFT", 6, 0)
+        r.text:SetPoint("RIGHT", r, "RIGHT", -4, 0)
+        r.text:SetJustifyH("LEFT")
+        r:SetScript("OnEnter", function(self) self.hover:Show() end)
+        r:SetScript("OnLeave", function(self) self.hover:Hide() end)
+        r:SetScript("OnClick", ns.Guard("dropdown", function(self)
+          Close()
+          opts.onPick(self.key)
+          b:Sync()
+        end))
+        menu.rows[i] = r
+      end
+      local col, row = math.floor((i - 1) / perCol), (i - 1) % perCol
+      r:ClearAllPoints()
+      r:SetPoint("TOPLEFT", menu, "TOPLEFT", 3 + col * colW, -3 - row * MENU_ROW)
+      r:SetWidth(colW)
+      r.key = o[1]
+      r.text:SetText(o[2])
+      UI.Color(r.text, o[1] == cur and "accent" or "textPrimary")
+      r.active:SetShown(o[1] == cur)
+      r:Show()
+    end
+    for i = #list + 1, #menu.rows do menu.rows[i]:Hide() end
+    catcher:Show()
+    menu:Show()
+  end
+  catcher:SetScript("OnClick", Close)
+  b:SetScript("OnClick", ns.Guard("dropdown", function() if menu:IsShown() then Close() else Open() end end))
+  b:SetScript("OnHide", Close)
+  b:SetTip(opts.title, nil, L["Click: choose"])
+  b.Open = Open
+  return b
+end

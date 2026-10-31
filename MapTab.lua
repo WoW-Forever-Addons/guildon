@@ -60,7 +60,7 @@ function ns.MapEntries(search, filter)
           value = L["%d s ago"]:format(math.max(0, math.floor(now - p.t))), valueColor = "textHint",
           tooltip = function()
             return "|c" .. ns.ClassHex(p.class) .. m.short .. "|r", { z.name, ns.ShowLayer() and ns.LayerLine(p) or nil,
-              QuestdonAPI and L["Right-click: Questdon's arrow to this member"] or nil },
+              ns.CanArrow and ns.CanArrow() and L["Right-click: arrow to this member"] or nil },
               L["Click: show on the world map"]
           end }
       end

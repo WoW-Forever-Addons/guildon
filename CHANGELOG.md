@@ -1,5 +1,14 @@
 # Changes
 
+## 0.9.0
+- **New required addons: Guildon: Crafts & Recipes and DonMap.** The CurseForge app installs both for you. If you install by hand, download them too and put the folders `Guildon_Crafts` and `DonMap` next to `Guildon` in `Interface\AddOns`, or Guildon does not load.
+- Professions, recipes, the wish list, trade and mail help, prices and Profitable are now an addon of their own: **Guildon: Crafts & Recipes** (folder Guildon_Crafts). This one is now **Guildon: Map & Members**. Crafts & Recipes takes over your professions, wishes and prices from Guildon at its first start, and still talks to guild members on Guildon 0.8.
+- Guildon keeps the guild map, the member list with classes and alts, the guild emblem and the arrow to a member. With Crafts & Recipes the member tooltips show the professions again.
+- One minimap button for all Guildon parts: a click shows the parts to choose from. The overview has a tile that opens Crafts & Recipes. /gn wishes, /gn export and /gn recipes point to /gnc.
+- The map pins are drawn by DonMap, the map layer of the Don addons, and look as before. Right-click a member to set the arrow, also without Questdon.
+- **Much less guild traffic:** your position only goes to members who look at a map near you (world map open, or the minimap within 800 yards), and every 60 seconds while you stand still; data of members who left the guild is dropped after 30 days; up to 8 messages go at once, then one per second, and messages that have to wait are sent later instead of being lost.
+- Window style from DonCore, the common base of the Don addons.
+
 ## 0.8.2
 - The tab Profitable is now off by default, so the window stays focused on the guild. Switch it on in Options, section Tabs.
 
