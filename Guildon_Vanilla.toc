@@ -1,9 +1,9 @@
 ## Interface: 11509
 ## Title: |cff3fa9f5Guil|rdon: Map & Members
-## Notes: Part of Guildon for Classic Era: guild members on the map, member list with classes and alts, arrow to a member. Needs Guildon: Crafts & Recipes.
-## Notes-deDE: Teil von Guildon auf Classic Era: Gildenmitglieder auf der Karte, Mitgliederliste mit Klassen und Twinks, Pfeil zu einem Mitglied. Braucht Guildon: Crafts & Recipes.
+## Notes: Part of Guildon for Classic Era: guild members on the map, member list with classes and alts, arrow to a member. Needs DonMap; Guildon: Crafts & Recipes optional.
+## Notes-deDE: Teil von Guildon auf Classic Era: Gildenmitglieder auf der Karte, Mitgliederliste mit Klassen und Twinks, Pfeil zu einem Mitglied. Braucht DonMap; Guildon: Crafts & Recipes optional.
 ## Author: DonCoohd
-## Version: 0.9.1
+## Version: 0.9.2
 ## X-Curse-Project-ID: 1770383
 ## Category: Guild
 ## Category-deDE: Gilde

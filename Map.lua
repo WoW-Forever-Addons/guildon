@@ -292,7 +292,9 @@ ns.PIN_LOOK = {
   groupFill = { 0.17, 0.18, 0.20 },
   -- (Daniel 26.10.) the guild's own crest small in the middle of the shield, the class colour stays as the ring around it:
   -- crestSize = share of the pin, crestUp = how far it sits above the middle (the shield is wider at the top)
-  crestSize = 0.52, crestUp = 0.05,
+  -- (Daniel 31.10.: "unten wurden dann die Klassenfarben ... abgeschnitten") the background is the shield itself, smaller
+  -- (a square tile touched the rim at the top and sides and left a big tip below); the crest sits in its upper part
+  crestSize = 0.62, crestUp = 0.03, crestMark = 0.72, crestMarkUp = 0.06,
   -- (Daniel 26.10.: "die Pins einen Tick kleiner") was 26, 22, 32, 26; (27.10.: "der Pin kann dann gleich groß wie die anderen
   -- sein") a group as large as one member, its number "3x" below it like the level
   world = 22, mini = 19, groupWorld = 22, groupMini = 19,
@@ -548,16 +550,23 @@ local function Paint(b, members, size, groupSize, opts)
   if b.rimFile ~= rimFile then b.rim:SetTexture(rimFile) b.rimFile = rimFile end
   b.mark:SetShown(dark and style == "libra" or false)
   if crest and style == "shield" then
-    local s = (#members == 1 and size or groupSize) * look.crestSize
-    for _, t in ipairs({ b.crestBg, b.crest }) do
-      t:SetSize(s, s)
-      t:ClearAllPoints()
-      t:SetPoint("CENTER", b, "CENTER", 0, s * look.crestUp / look.crestSize)
-    end
+    local p = #members == 1 and size or groupSize
+    local s, up = p * look.crestSize, p * look.crestUp
+    local m = s * look.crestMark
+    b.crestBg:SetSize(s, s)
+    b.crestBg:ClearAllPoints()
+    b.crestBg:SetPoint("CENTER", b, "CENTER", 0, up)
+    b.crest:SetSize(m, m)
+    b.crest:ClearAllPoints()
+    b.crest:SetPoint("CENTER", b, "CENTER", 0, up + s * look.crestMarkUp)
     b.crest:SetTexture(crest.file)
     if dark then b.crest:SetVertexColor(1, 1, 1) else b.crest:SetVertexColor(crest.r, crest.g, crest.b) end
     b.crest:Show()
-    if crest.br and not dark then b.crestBg:SetColorTexture(crest.br, crest.bg, crest.bb, 0.95) b.crestBg:Show() else b.crestBg:Hide() end
+    if crest.br and not dark then
+      b.crestBg:SetTexture(look.shieldDisk)
+      b.crestBg:SetVertexColor(crest.br, crest.bg, crest.bb, 0.95)
+      b.crestBg:Show()
+    else b.crestBg:Hide() end
   else
     b.crest:Hide()
     b.crestBg:Hide()

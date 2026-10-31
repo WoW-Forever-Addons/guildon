@@ -1,5 +1,8 @@
 # Changes
 
+## 0.9.2
+- **Guild crest on the shield pin:** the crest now sits on a smaller shield in your guild's colour instead of a square, so the class colour stays a closed ring around it and the crest is in the middle.
+
 ## 0.9.1
 - **Guildon: Crafts & Recipes is now optional.** Map & Members only needs DonMap. Install Crafts & Recipes if you want professions, recipes and wishes, and the professions in the member tooltips; your old Guildon data moves over at its first start.
 
