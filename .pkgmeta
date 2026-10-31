@@ -1,5 +1,9 @@
 package-as: Guildon
 
+required-dependencies:
+  - donmap
+  - guildon-crafts
+
 manual-changelog:
   filename: CHANGELOG.md
   markup-type: markdown
