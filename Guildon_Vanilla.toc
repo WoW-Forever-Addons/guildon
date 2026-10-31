@@ -3,7 +3,7 @@
 ## Notes: Part of Guildon for Classic Era: guild members on the map, member list with classes and alts, arrow to a member. Needs Guildon: Crafts & Recipes.
 ## Notes-deDE: Teil von Guildon auf Classic Era: Gildenmitglieder auf der Karte, Mitgliederliste mit Klassen und Twinks, Pfeil zu einem Mitglied. Braucht Guildon: Crafts & Recipes.
 ## Author: DonCoohd
-## Version: 0.9.0
+## Version: 0.9.1
 ## X-Curse-Project-ID: 1770383
 ## Category: Guild
 ## Category-deDE: Gilde
@@ -11,7 +11,8 @@
 ## SavedVariables: GuildonDB
 ## AddonCompartmentFunc: Guildon_OnAddonCompartmentClick
 ## X-License: Code MIT License, Copyright (c) 2026 DonCoohd (LICENSE.txt). Libs/LibStub: public domain.
-## Dependencies: DonMap, Guildon_Crafts
+## Dependencies: DonMap
+## OptionalDeps: Guildon_Crafts
 
 Libs\LibStub\LibStub.lua
 Libs\DonCore\DonCore.lua

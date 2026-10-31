@@ -5,7 +5,7 @@ Für World of Warcraft: Forever (Client "Camelot", Interface 16001) und WoW Clas
 Alles läuft zwischen Mitgliedern, die Guildon haben, über den Addon-Kanal der Gilde. Es gibt keinen Server.
 
 **Neu in 0.9.0:** Guildon besteht jetzt aus Teilen. Berufe, Rezepte, Wunschliste, Handel und Post, Preise und Profitabel sind
-**Guildon: Crafts & Recipes** (Ordner `Guildon_Crafts`). Map & Members braucht Crafts & Recipes und DonMap. Deine Daten aus
+**Guildon: Crafts & Recipes** (Ordner `Guildon_Crafts`). Map & Members braucht DonMap, Crafts & Recipes ist optional (dann mit den Berufen im Mitglieder-Tooltip). Deine Daten aus
 Guildon übernimmt Crafts & Recipes beim ersten Start von selbst. Alle Teile teilen sich einen Knopf an der Minikarte: ein Klick
 zeigt die Teile zur Auswahl.
 

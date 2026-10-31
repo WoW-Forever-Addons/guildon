@@ -3,14 +3,15 @@
 ## Notes: Part of Guildon: guild members on the map, member list with classes and alts, arrow to a member. Needs Guildon: Crafts & Recipes.
 ## Notes-deDE: Teil von Guildon: Gildenmitglieder auf der Karte, Mitgliederliste mit Klassen und Twinks, Pfeil zu einem Mitglied. Braucht Guildon: Crafts & Recipes.
 ## Author: DonCoohd
-## Version: 0.9.0
+## Version: 0.9.1
 ## X-Curse-Project-ID: 1770383
 ## Category: Guild
 ## Category-deDE: Gilde
 ## IconTexture: Interface\Icons\INV_Misc_GroupNeedMore
 ## SavedVariables: GuildonDB
 ## AddonCompartmentFunc: Guildon_OnAddonCompartmentClick
-## Dependencies: DonMap, Guildon_Crafts
+## Dependencies: DonMap
+## OptionalDeps: Guildon_Crafts
 ## X-License: Code MIT License, Copyright (c) 2026 DonCoohd (LICENSE.txt). Libs/LibStub: public domain.
 
 Libs\LibStub\LibStub.lua

@@ -1,5 +1,8 @@
 # Changes
 
+## 0.9.1
+- **Guildon: Crafts & Recipes is now optional.** Map & Members only needs DonMap. Install Crafts & Recipes if you want professions, recipes and wishes, and the professions in the member tooltips; your old Guildon data moves over at its first start.
+
 ## 0.9.0
 - **New required addons: Guildon: Crafts & Recipes and DonMap.** The CurseForge app installs both for you. If you install by hand, download them too and put the folders `Guildon_Crafts` and `DonMap` next to `Guildon` in `Interface\AddOns`, or Guildon does not load.
 - Professions, recipes, the wish list, trade and mail help, prices and Profitable are now an addon of their own: **Guildon: Crafts & Recipes** (folder Guildon_Crafts). This one is now **Guildon: Map & Members**. Crafts & Recipes takes over your professions, wishes and prices from Guildon at its first start, and still talks to guild members on Guildon 0.8.
