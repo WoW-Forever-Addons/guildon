@@ -1,6 +1,6 @@
 local addonName, ns = ...
 local L = ns.L
-ns.Style = LibStub("DonCore-1.0"):Get("Style", 4):ForAddon() -- own kit from DonCore (Libs\DonCore\Style.lua): Theme.lua changes its colours, PAL and DEFAULT_ALPHA without touching the other addons' kit
+ns.Style = LibStub("DonCore-1.0"):Get("Style", 4):ForAddon() -- DonCore's Style (Libs/DonCore/Style.lua) for texts: Hex, Number, Wordmark, tooltips; the windows are built from DonCore's Kit (02.11.2026)
 
 ---------------------------------------------------------------------------
 -- Guildon: one addon for the whole guild (GUILDON_PLAN.md). Step 1: frame, guild roster, exchange core.
@@ -11,14 +11,10 @@ ns.Style = LibStub("DonCore-1.0"):Get("Style", 4):ForAddon() -- own kit from Don
 -- (31.10.2026) Error guard, events, saved table and helpers are in Shared/Base.lua (GuildShared/), loaded right after this file.
 ---------------------------------------------------------------------------
 ns.defaults = {
-  panel = {},          -- window position and collapsed state (Style.Panel get/set)
+  window = {},         -- (02.11.2026, Don style) place and size of the window (DonCore Kit.Window's store)
   tab = "overview",    -- last open tab
   sets = {},           -- shared data sets, key "<kind>:<owner>" (Comm.lua)
   peers = {},          -- Guildon users seen: full name -> { v = version, t = time() }
-  panelLocked = false,
-  panelScale = 1,
-  panelAlpha = 0.93,
-  combatFade = false,
 }
 ns.SCHEMA = 1
 ns.WORDMARK = "|cff3fa9f5Guil|rdon"
@@ -30,13 +26,22 @@ ns.ERROR_HINT = "an error occurred, /gn diag for details"
 
 -- (GuildShared/Base.lua calls this once the saved table is there, before the init callbacks)
 function ns.MigrateDB(db)
-  -- (Daniel 26.10.: the darker look of the Gemini drafts) the old default opacity 0.82 moves to the new one once; a value he chose stays
-  if not db.darkLook then
-    if db.panelAlpha == 0.82 then db.panelAlpha = 0.93 end
-    db.darkLook = true
-  end
   -- (Daniel 28.10.) the test switches /gn libra and /gn crest are gone; a saved one from a test package is dropped
   db.testLibra, db.testCrest = nil, nil
+  -- (02.11.2026, StyleKit 2 step 4) the window is DonCore's Kit.Window now: the old panel's place, size, lock, scale,
+  -- opacity and combat fade are gone (the Don window keeps place and size in db.window)
+  db.panel, db.panelWidth, db.panelHeight, db.panelLocked, db.panelScale, db.panelAlpha, db.combatFade, db.darkLook = nil, nil, nil, nil, nil, nil, nil, nil
+  if db.memberFilter ~= "guildon" and db.memberFilter ~= "online" then db.memberFilter = nil end
+  if db.tab == "options" then db.tab = "overview" end
+  -- (04.11.2026, Era-Test) new defaults (Daniel 04.11.: map icon size 60 %, minimap icon size 65 %, hide while flagged for
+  -- PvP off). The old defaults were written into GuildonDB, so once only the values still on the old default move to the
+  -- new one; what the player set himself stays.
+  if not db.defaults1104 then
+    if db.mapWorldScale == 1 then db.mapWorldScale = 0.6 end
+    if db.mapMiniScale == 1 then db.mapMiniScale = 0.65 end
+    if db.mapHidePvP == true then db.mapHidePvP = false end
+    db.defaults1104 = true
+  end
 end
 
 -- Guildon's lines in /gn diag after the exchange numbers (GuildShared/Comm.lua ns.PrintDiag)
@@ -73,6 +78,7 @@ SLASH_GUILDON2 = "/guildon"
 ns.COMMANDS = {
   { "/gn", "show or hide the window" },
   { "/gn members", "the guild members" },
+  { "/gn options", "all settings (also the cog in the window)" },
   { "/gn sync", "ask the guild for new data now" },
   { "/gn diag", "state of the exchange and errors" },
   { "/gn demo", "example guild to try the windows (again: off)" },
@@ -90,6 +96,8 @@ function ns.Slash(msg)
     if ns.ToggleWindow then ns.ToggleWindow() end
   elseif msg == "members" or msg == "mitglieder" then
     if ns.OpenTab then ns.OpenTab("members") end
+  elseif msg == "options" or msg == "optionen" or msg == "config" then
+    if not (ns.OpenOptions and ns.OpenOptions()) then ns.Print(L["The options window is missing (DonCore)."]) end
   elseif msg == "sync" then
     if ns.Hello then ns.Hello(true) end
     ns.Print(L["Asked the guild for new data."])

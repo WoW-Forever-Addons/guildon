@@ -3,11 +3,11 @@
 ## Notes: Part of Guildon for Classic Era: guild members on the map, member list with classes and alts, arrow to a member. Needs DonMap; Guildon: Crafts & Recipes optional.
 ## Notes-deDE: Teil von Guildon auf Classic Era: Gildenmitglieder auf der Karte, Mitgliederliste mit Klassen und Twinks, Pfeil zu einem Mitglied. Braucht DonMap; Guildon: Crafts & Recipes optional.
 ## Author: DonCoohd
-## Version: 0.9.3
+## Version: 0.10.0
 ## X-Curse-Project-ID: 1770383
 ## Category: Guild
 ## Category-deDE: Gilde
-## IconTexture: Interface\Icons\INV_Misc_GroupNeedMore
+## IconTexture: Interface\AddOns\Guildon\Media\minimap
 ## SavedVariables: GuildonDB
 ## AddonCompartmentFunc: Guildon_OnAddonCompartmentClick
 ## X-License: Code MIT License, Copyright (c) 2026 DonCoohd (LICENSE.txt). Libs/LibStub: public domain.
@@ -17,6 +17,9 @@
 Libs\LibStub\LibStub.lua
 Libs\DonCore\DonCore.lua
 Libs\DonCore\Style.lua
+Libs\DonCore\MinimapButton.lua
+Libs\DonCore\Kit.lua
+Libs\DonCore\Options.lua
 Locales\enUS.lua
 Locales\deDE.lua
 Locales\frFR.lua
@@ -29,15 +32,13 @@ Locales\zhTW.lua
 Classic.lua
 Core.lua
 Shared\Base.lua
-Shared\Theme.lua
 Shared\Guild.lua
 Shared\Comm.lua
 Demo.lua
-Shared\Kit.lua
-Shared\List.lua
 Shared\Window.lua
 Pages.lua
 MapTab.lua
+Options.lua
 Map.lua
 Extras.lua
 Shared\Launcher.lua

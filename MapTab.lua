@@ -1,30 +1,32 @@
 local _, ns = ...
 local L = ns.L
-local Style = ns.Style
+local Kit = ns.Kit
 
 ---------------------------------------------------------------------------
--- Tab "Map" (GUILDON_PLAN.md step 6): who shares where to see the guild, and where the members with Guildon are.
+-- Tab "Map" (GUILDON_PLAN.md step 6; Don style 02.11.2026, mockup docs/layout_2026-11-02/guildon/ part 2): where the members
+-- with Guildon are, grouped by zone, over the whole height; right the picked member with its actions (under 960 px over the
+-- list). The settings (sharing, pins, sizes, opacity, layer) are in DonCore's options window; the status button on top says
+-- how the player shares and opens that option (Daniel 02.11.2026: "Statusknopf bleibt").
 ---------------------------------------------------------------------------
-local UI = ns.UI
-local PAL = Style.PAL
-local PAGE_W, CONTENT_H = ns.PAGE_W, ns.CONTENT_H
-local TOP = 180
+local S = Kit.SIZE
+local DETAIL_W = 280
 local SHARE_TEXT = { guild = "With the guild", group = "Only with my group", off = "Off" }
 local MAP_FILTER_TEXT = { all = "All", here = "My zone" }
--- (Daniel 26.10.) the look of the pins; texts for guildon_keys.py
-local PIN_STYLE_TEXT = { emblem = "Guild sign", shield = "Shield only", dot = "Plain dot" }
+local SHARE_COLOR = { guild = "green", group = "yellow", off = "grey" }
 
 local function ZoneName(map)
   local info = C_Map and C_Map.GetMapInfo and ns.Call(C_Map.GetMapInfo, map)
   return type(info) == "table" and ns.Str(info.name) or ("#" .. tostring(map))
 end
+ns.ZoneName = ZoneName
+
+local function Ago(p) return L["%d s ago"]:format(math.max(0, math.floor(GetTime() - (p.t or GetTime())))) end
 
 -- Who is where (Daniel 26.10., Gemini draft): grouped by zone, the zone you are in open, the others folded (a click opens
 -- them, a search opens the zones with a hit). Rows: name, class, level, layer, age. ns.db.mapZone[map] = true / false is
 -- what the player chose for a zone.
 function ns.MapEntries(search, filter)
   search = search or ""
-  local now = GetTime()
   local here = ns.PlayerMapPos and ns.PlayerMapPos() or nil
   local zones, order = {}, {}
   for name, p in pairs(ns.Positions()) do
@@ -44,22 +46,22 @@ function ns.MapEntries(search, filter)
   end)
   local out = {}
   local chosen = type(ns.db.mapZone) == "table" and ns.db.mapZone or {}
+  local layer = ns.ShowLayer()
   for _, z in ipairs(order) do
     table.sort(z.list, function(a, b) return a.name < b.name end)
     local open = chosen[z.map]
     if open == nil then open = z.map == here or #order == 1 or search ~= "" end
-    out[#out + 1] = { key = "z:" .. tostring(z.map), fold = z.map, count = #z.list, open = open, topLine = #out > 0, color = "gold",
-      text = (open and "- " or "+ ") .. z.name, value = tostring(#z.list), valueColor = "textHint" }
+    out[#out + 1] = { kind = "group", key = "z:" .. tostring(z.map), fold = z.map, count = #z.list, collapsed = not open,
+      plainCase = true, text = z.name, right = z.map == here and L["your zone"] or nil }
     if open then
       for _, m in ipairs(z.list) do
         local p, name = m.p, m.name
-        out[#out + 1] = { key = name, name = name, p = p,
-          text = "|c" .. ns.ClassHex(p.class) .. m.short .. "|r",
-          cols = { "|c" .. ns.ClassHex(p.class) .. m.class .. "|r", "|c" .. Style.Hex("textPrimary") .. (p.level or 0) .. "|r",
-            ns.ShowLayer() and ("|c" .. Style.Hex("textSecondary") .. ns.LayerLine(p) .. "|r") or "" },
-          value = L["%d s ago"]:format(math.max(0, math.floor(now - p.t))), valueColor = "textHint",
-          tooltip = function()
-            return "|c" .. ns.ClassHex(p.class) .. m.short .. "|r", { z.name, ns.ShowLayer() and ns.LayerLine(p) or nil,
+        local cls = ns.ClassHex(p.class)
+        out[#out + 1] = { kind = "table", key = name, name = name, p = p, zone = z.name, class = p.class, status = "green",
+          cells = { "|c" .. cls .. m.short .. "|r", { text = m.class, color = Kit.C.muted }, { text = tostring(p.level or 0), color = Kit.C.title },
+            { text = layer and ns.LayerLine(p) or "", color = Kit.C.muted }, { text = Ago(p), color = Kit.C.quiet } },
+          tooltipFn = function()
+            return "|c" .. cls .. m.short .. "|r", { z.name, layer and ns.LayerLine(p) or nil,
               ns.CanArrow and ns.CanArrow() and L["Right-click: arrow to this member"] or nil },
               L["Click: show on the world map"]
           end }
@@ -69,139 +71,150 @@ function ns.MapEntries(search, filter)
   return out, #order
 end
 
+local function OpenShareOption()
+  local Opt = LibStub("DonCore-1.0"):Get("Options", 1)
+  if Opt and Opt.Open then Opt.Open(ns.OPTIONS_ID, "map") end
+end
+
+local function FillDetail(p, d, e)
+  local name, pos = e.name, e.p
+  local m = ns.Member and ns.Member(name)
+  local cls = ns.ClassHex(pos.class)
+  d:SetHead({ level = pos.level, levelStatus = "grey", title = "|c" .. cls .. ns.ShortName(name) .. "|r",
+    meta = (LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[pos.class or ""]) or "" })
+  local acts = { { text = L["On the map"], kind = "primary", onClick = function() ns.ShowOnMap(name) end } }
+  if ns.CanArrow and ns.CanArrow() then acts[#acts + 1] = { text = L["Arrow"], onClick = function() ns.ArrowTo(name) end } end
+  if name ~= ns.MyName() then acts[#acts + 1] = { text = L["Whisper"], onClick = function() ns.WhisperMember(name) end } end
+  d:SetActions(acts)
+  d:Begin()
+  d:Line(L["Zone"], Kit.C.muted, e.zone, Kit.C.title)
+  if ns.ShowLayer() then d:Line(L["Layer"], Kit.C.muted, ns.LayerLine(pos), Kit.C.title) end
+  d:Line(L["Reported"], Kit.C.muted, Ago(pos), Kit.C.title)
+  if m and m.rank and m.rank ~= "" then d:Line(L["Rank"], Kit.C.muted, m.rank, Kit.C.title) end
+  local lines = m and ns.MemberLines and ns.MemberLines(m) or {}
+  if #lines > 0 then
+    d:Section(L["More"])
+    for _, l in ipairs(lines) do d:Line(l) end
+  end
+  d:Section(L["Clicks"])
+  d:Line(L["Click: show on the world map"], Kit.C.muted)
+  if ns.CanArrow and ns.CanArrow() then d:Line(L["Right-click: arrow to this member"], Kit.C.muted) end
+  d:End()
+end
+
 ns.PAGE_BUILDERS.map = function(p)
-  local label = UI.Text(p, "GameFontHighlightSmall", 0, -5, 160, "textSecondary")
-  label:SetText(L["Share my position"])
-  p.share = UI.Dropdown(p, 200, {
-    title = L["Share my position"],
-    get = function() return ns.db.mapShare or "guild" end,
-    options = function() return { { "guild", L[SHARE_TEXT.guild] }, { "group", L[SHARE_TEXT.group] }, { "off", L[SHARE_TEXT.off] } } end,
-    onPick = function(key) ns.db.mapShare = key p:Refresh() end,
-  })
-  p.share:SetPoint("TOPLEFT", p, "TOPLEFT", 150, 0)
-  -- (Daniel 27.10.) the layer in tooltips, the list and the pick list: off by default
-  p.layer = UI.CheckBox(p, L["Show the layer"], function() return ns.db.mapLayer end,
-    function(v) ns.db.mapLayer = v or nil p:Refresh() end, { w = 300 })
-  p.layer:SetPoint("TOPLEFT", p, "TOPLEFT", 380, -2)
-  p.layer:SetTip(L["Show the layer"], { L["The layer (server copy of the zone) of each member in the tooltips and lists, compared with yours. Off by default."] })
-  local function Toggle(x, text, key)
-    local b = UI.CheckBox(p, text, function() return ns.db[key] end, function(v) ns.db[key] = v end, { w = 226 })
-    b:SetPoint("TOPLEFT", p, "TOPLEFT", x, -32)
-    return b
-  end
-  p.pvp = Toggle(0, L["Hide while flagged for PvP"], "mapHidePvP")
-  p.world = Toggle(232, L["Members on the world map"], "mapWorld")
-  p.mini = Toggle(464, L["Members on the minimap"], "mapMinimap")
-  -- (Daniel 26.10.) everyone sets the size of the pins on the world map and the minimap himself, 25 to 200 %
-  local function Size(x, text, key, tip)
-    local sl = UI.Slider(p, text, { w = 340, labelW = 140, min = 0.25, max = 2, step = 0.05,
-      get = function() return ns.db[key] or 1 end,
-      set = function(v) ns.db[key] = v if ns.UpdateWorldPins then ns.UpdateWorldPins() end if ns.UpdateMiniPins then ns.UpdateMiniPins() end end })
-    sl:SetPoint("TOPLEFT", p, "TOPLEFT", x, -58)
-    sl:SetTip(text, { L[tip] })
-    return sl
-  end
-  p.worldSize = Size(0, L["Map icon size"], "mapWorldScale", "Size of the guild pins on the world map. 100 % is the normal size.")
-  p.miniSize = Size(360, L["Minimap icon size"], "mapMiniScale", "Size of the guild pins on the minimap. 100 % is the normal size.")
-  -- (Daniel 26.10.) dungeons and raids: off by default, on with this switch (share your place there and see the others)
-  p.inst = UI.CheckBox(p, L["Minimap in dungeons and raids"], function() return ns.db.mapInstance end,
-    function(v) ns.db.mapInstance = v or nil if ns.UpdateMiniPins then ns.UpdateMiniPins() end end, { w = 380 })
-  p.inst:SetPoint("TOPLEFT", p, "TOPLEFT", 0, -82)
-  p.inst:SetTip(L["Minimap in dungeons and raids"], { L["Off by default. On: inside a dungeon or raid you share your place and see the members with Guildon on the minimap, as far as the game gives positions there."] })
-  -- (Daniel 26.10., after the Discord feedback) the look of the pins with a preview in the class colours
-  local styleLabel = UI.Text(p, "GameFontHighlightSmall", 0, -113, 140, "textSecondary")
-  styleLabel:SetText(L["Pin look"])
-  p.pinStyle = UI.Dropdown(p, 170, {
-    title = L["Pin look"],
-    get = function() return ns.PinStyle() end,
-    options = function()
-      local out = {}
-      for _, k in ipairs(ns.PIN_STYLES) do out[#out + 1] = { k, L[PIN_STYLE_TEXT[k]] } end
-      return out
-    end,
-    onPick = function(key)
-      ns.db.pinStyle = key ~= "emblem" and key or nil
-      if ns.UpdateWorldPins then ns.UpdateWorldPins() end
-      if ns.UpdateMiniPins then ns.UpdateMiniPins() end
+  p.search = Kit.SearchBox(p, { placeholder = L["Name, zone"], onChange = function() if p:IsShown() then p:Refresh() end end })
+  p.chips = Kit.ChipBar(p, { onChange = function(key) ns.db.mapFilter = key ~= "all" and key or nil p:Refresh() end })
+  for _, k in ipairs({ "all", "here" }) do p.chips:Add(k, L[MAP_FILTER_TEXT[k]]) end
+  p.count = Kit.Text(p, "sub", Kit.C.muted, "RIGHT")
+  -- (Daniel 02.11.2026) the status of sharing; a click opens the option
+  p.share = Kit.Button(p, "", { small = true, onClick = OpenShareOption })
+  p.share.dot = p.share:CreateTexture(nil, "OVERLAY")
+  p.share.dot:SetTexture("Interface\\Buttons\\WHITE8x8")
+  p.share.dot:SetSize(6, 6)
+  p.share.dot:SetPoint("LEFT", p.share, "LEFT", 8, 0)
+  p.share:SetTooltip(L["Share my position"], { L["Who sees you on the map. Click: change it in the options."] })
+  p.head = Kit.TableHead(p, { icon = true, columns = {
+    { key = "name", text = L["Name"], width = 110, grow = true },
+    { key = "class", text = L["Class"], width = 96 },
+    { key = "level", text = L["Lvl"], width = 30, justify = "RIGHT" },
+    { key = "layer", text = L["Layer"], width = 48 },
+    { key = "age", text = L["Reported"], width = 70, justify = "RIGHT" } } })
+  p.list = Kit.List(p, {
+    onToggle = function(e)
+      ns.db.mapZone = type(ns.db.mapZone) == "table" and ns.db.mapZone or {}
+      ns.db.mapZone[e.fold] = not e.collapsed
       p:Refresh()
     end,
-  })
-  p.pinStyle:SetPoint("TOPLEFT", p, "TOPLEFT", 150, -108)
-  -- preview: four classes at the size the world map shows them (Daniel 27.10.: the group example left out)
-  p.preview = {}
-  local PREVIEW = { { "WARRIOR", 34 }, { "MAGE", 60 }, { "PRIEST", 21 }, { "HUNTER", 12 } }
-  for i, c in ipairs(PREVIEW) do
-    local b = ns.PreviewPin(p, 22)
-    b:SetPoint("TOPLEFT", p, "TOPLEFT", 335 + (i - 1) * 29, -104)
-    b.previewMembers = { { name = "", p = { class = c[1], level = c[2] } } }
-    p.preview[i] = b
-  end
-  -- (Daniel 27.10.: "einen Transparenzregler ähnlich wie den Größenregler") the opacity of the pins on both maps, 20 to 100 %
-  -- (Daniel 27.10.: "in der kleinsten Breite passt es gerade so nicht") it ends at the page's right edge
-  local alphaX = 335 + #PREVIEW * 29 + 6
-  p.pinAlpha = UI.Slider(p, L["Opacity"], { w = PAGE_W - alphaX, labelW = 74, min = 0.2, max = 1, step = 0.05,
-    get = function() return ns.db.mapPinAlpha or 1 end,
-    set = function(v)
-      ns.db.mapPinAlpha = v < 0.999 and v or nil
-      if ns.UpdateWorldPins then ns.UpdateWorldPins() end
-      if ns.UpdateMiniPins then ns.UpdateMiniPins() end
-      for _, b in ipairs(p.preview) do b:SetAlpha(ns.PinAlpha()) end
-    end })
-  p.pinAlpha:SetPoint("TOPLEFT", p, "TOPLEFT", alphaX, -110)
-  p.pinAlpha:SetTip(L["Opacity"], { L["How see-through the guild pins on the world map and the minimap are. 100 % is fully visible."] })
-  p.note = UI.Text(p, "GameFontDisableSmall", 0, -136, PAGE_W, "textHint")
-  p.note:SetText(L["Only members with Guildon can be shown; in dungeons and raids only with the switch above."])
-  p.search = UI.EditBox(p, 210, L["Search"], { onChange = function() if p:IsShown() then p:Refresh() end end })
-  p.search:SetPoint("TOPLEFT", p, "TOPLEFT", 0, -150)
-  p.filter = UI.Dropdown(p, 150, {
-    title = L["Show"],
-    get = function() return ns.db.mapFilter == "here" and "here" or "all" end,
-    options = function() return { { "all", L[MAP_FILTER_TEXT.all] }, { "here", L[MAP_FILTER_TEXT.here] } } end,
-    onPick = function(key) ns.db.mapFilter = key p:Refresh() end,
-  })
-  p.filter:SetPoint("TOPLEFT", p, "TOPLEFT", 218, -150)
-  p.count = UI.Text(p, "GameFontHighlightSmall", PAGE_W - 160, -156, 160, "textHint")
-  p.count:SetJustifyH("RIGHT")
-  p.list = ns.NewList(p, { x = 0, y = -TOP, width = PAGE_W, height = CONTENT_H - TOP, rowHeight = ns.ROW_H,
-    columns = { { 150, 100, "LEFT" }, { 254, 26, "RIGHT" }, { 296, 190, "LEFT", "grow" } }, textRight = 146,
-    onSelect = function(e, button)
-      if e.fold then
-        ns.db.mapZone = type(ns.db.mapZone) == "table" and ns.db.mapZone or {}
-        ns.db.mapZone[e.fold] = not e.open
-        p:Refresh()
-        return
-      end
+    onClick = function(e, button)
       if not e.name then return end
-      if button == "RightButton" and ns.ArrowTo and ns.ArrowTo(e.name) then return end
-      ns.ShowOnMap(e.name)
-    end })
-  p.empty = UI.Text(p, "GameFontHighlight", 0, -TOP - 30, PAGE_W, "textSecondary")
-  p.empty:SetJustifyH("CENTER")
-  p.empty:SetText(L["No member with Guildon is sharing a position right now."])
-  p.OnResize = function(self, h) self.list:SetHeight(h - TOP) end
-  -- wider window: the list and the zone column take the extra width
-  p.OnWidth = function(self, w)
-    self.note:SetWidth(w)
+      if button == "RightButton" then if ns.ArrowTo then ns.ArrowTo(e.name) end return end
+      p.picked = e.name
+      p.list:Select(e)
+      ns.Relayout()
+      -- a second click on the picked member shows it on the world map
+      if p.lastClick == e.name then ns.ShowOnMap(e.name) end
+      p.lastClick = e.name
+    end,
+  })
+  p.list:SetEmpty(L["No member with Guildon is sharing a position right now."])
+  p.detail = Kit.Detail(p, { onClose = function() p.picked, p.lastClick = nil, nil p.list:Select(nil) ns.Relayout() end })
+  p.Search = function(self) return tostring(self.search:GetText() or ""):lower():gsub("^%s+", ""):gsub("%s+$", "") end
+  p.Hint = function() return L["Only members with Guildon can be shown; in dungeons and raids only with the option."] end
+  p.Picked = function(self)
+    for _, e in ipairs(self.list.items or {}) do if e.name and e.name == self.picked then return e end end
+  end
+  p.Layout = function(self, w, h, mode)
+    self._w, self._h, self._mode = w, h, mode
+    local narrow = mode ~= "full"
+    local side = narrow and 0 or DETAIL_W + S.pad
+    local lw = w - 2 * S.pad - side
+    local y = S.gap
+    self.search:ClearAllPoints()
+    self.search:SetPoint("TOPLEFT", self, "TOPLEFT", S.pad, -y)
+    local sw = math.min(200, math.floor(lw * 0.3))
+    self.search:Layout(sw)
+    -- right: the share button (its text cut to what is left), the count left of it
+    local shareMax = math.min(230, math.floor(lw * 0.36))
+    self.share:Layout(math.min(self.share.natural or shareMax, shareMax))
+    self.share:ClearAllPoints()
+    self.share:SetPoint("TOPRIGHT", self, "TOPLEFT", S.pad + lw, -y - 2)
     self.count:ClearAllPoints()
-    self.count:SetPoint("TOPLEFT", self, "TOPLEFT", w - 160, -156)
-    self.list:SetWidth(w)
-    self.empty:SetWidth(w)
+    self.count:SetPoint("TOPRIGHT", self.share, "TOPLEFT", -S.gap, -5)
+    Kit.Fit(self.count, 120)
+    local cx = S.pad + lw - self.share:GetWidth() - S.gap - math.min(Kit.TextWidth(self.count), 120) - S.gap
+    self.chips:ClearAllPoints()
+    self.chips:SetPoint("TOPLEFT", self, "TOPLEFT", S.pad + sw + S.gap, -y - 2)
+    self.chips:Layout(math.max(40, cx - (S.pad + sw + S.gap)))
+    y = y + S.button + S.gap
+    self.head:ClearAllPoints()
+    self.head:SetPoint("TOPLEFT", self, "TOPLEFT", S.pad, -y)
+    self.head:Bind(self.list)
+    self.head:Layout(lw)
+    y = y + S.chip
+    self.list:ClearAllPoints()
+    self.list:SetPoint("TOPLEFT", self, "TOPLEFT", S.pad, -y)
+    self.list:Resize(lw, math.max(40, h - y - S.gap))
+    local e = self:Picked()
+    local show = e and true or (not narrow and true) or false
+    self.detail:SetShown(show)
+    if show then
+      local dw = narrow and math.min(DETAIL_W, w - 2 * S.pad) or DETAIL_W
+      self.detail:ClearAllPoints()
+      self.detail:SetPoint("TOPRIGHT", self, "TOPRIGHT", -S.pad, -S.gap)
+      self.detail:Layout(dw, h - 2 * S.gap)
+      if narrow then pcall(self.detail.SetFrameLevel, self.detail, (self.list:GetFrameLevel() or 1) + 20) end
+      if e then
+        self.detail.close:Show()
+        FillDetail(self, self.detail, e)
+      else
+        -- nobody picked: the card says what to do
+        self.detail.close:Hide()
+        self.detail:SetHead({ title = L["Map"], meta = L["Pick a member in the list."] })
+        self.detail:SetActions({ { text = L["Options"], onClick = OpenShareOption } })
+        self.detail:Begin()
+        self.detail:Para(L["Members with Guildon who share their position are listed here by zone. Click a member to see more, right-click for the arrow."], Kit.C.muted)
+        self.detail:End()
+      end
+    end
   end
   p.Refresh = function(self)
-    self.share:Sync() self.filter:Sync() self.pvp:Sync() self.world:Sync() self.mini:Sync() self.worldSize:Sync() self.miniSize:Sync() self.inst:Sync()
-    self.pinStyle:Sync() self.pinAlpha:Sync() self.layer:Sync()
-    for _, b in ipairs(self.preview) do
-      ns.PaintPreview(b, b.previewMembers, 22, 27)
-      b:Show()
-    end
-    local search = tostring(self.search:GetText() or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
-    local data = ns.MapEntries(search, ns.db.mapFilter)
-    self.list:SetData(data)
+    local share = ns.db.mapShare or "guild"
+    local st = Kit.STATUS[SHARE_COLOR[share] or "grey"]
+    self.share:SetText("   " .. L["You share: %s"]:format(L[SHARE_TEXT[share] or SHARE_TEXT.guild]))
+    self.share.dot:SetVertexColor(st.fg[1], st.fg[2], st.fg[3], 1)
+    self.chips:SetActive(ns.db.mapFilter == "here" and "here" or "all")
+    local data = ns.MapEntries(self:Search(), ns.db.mapFilter)
+    self.head.cells[4]:SetShown(ns.ShowLayer())
+    self.list:SetItems(data)
+    local picked = self:Picked()
+    self.list.selected = picked
+    self.list:Draw()
     -- count from the zone rows: members of a closed zone have no row of their own
     local n = 0
     for _, e in ipairs(data) do if e.fold then n = n + (e.count or 0) end end
     self.count:SetText(L["%d members"]:format(n))
-    self.empty:SetShown(#data == 0)
+    if self._w then self:Layout(self._w, self._h, self._mode) end
   end
   -- the ages count up while the page is open
   p.tick = 0

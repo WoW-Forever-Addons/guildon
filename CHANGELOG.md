@@ -1,5 +1,14 @@
 # Changes
 
+## 0.10.0
+- **The Don look:** the window you can drag from 720x420 to 1300x900 with the shared look of the Don addons: Overview with tiles, Members with sortable columns, filters All / Online / With Guildon, class symbols, right-click to invite and a census (classes, levels, online by zone; click a class to filter), Map with zones to fold, the member on the map, arrow and whisper.
+- **Options in the Don family window** (`/gn options`); the Options tab is gone. Locking, hiding in combat and Shift-scaling the window are gone.
+- **Map defaults:** pin sizes 60 % and 65 %, hiding in PvP is off (changed once).
+- **Minimap button:** the guild crest with a golden ring, menu with the logo of each part, a line to the options and "Hide minimap button".
+- **Window size:** all Don windows share one scale, 80 % by default, set from 60 to 110 % under General > Window in the options window. Saved window sizes are reset once, places stay.
+- **Addon list:** the addon has its own logo in the game's addon list.
+- **Update note:** new files, so restart the game after updating (a /reload is not enough).
+
 ## 0.9.3
 - **Shield pin:** the black rim of the shield is now equally thick all around, also on the slanted sides down to the tip.
 

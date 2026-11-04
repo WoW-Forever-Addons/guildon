@@ -26,12 +26,13 @@ local function Mult(v) return math.max(0.25, math.min(2, tonumber(v) or 1)) end
 local function DB()
   local db = ns.db
   if db.mapShare == nil then db.mapShare = "guild" end   -- "guild", "group", "off"
-  if db.mapHidePvP == nil then db.mapHidePvP = true end
+  -- (04.11.2026, Era-Test) defaults from ns.OPTION_DEFAULTS: PvP hiding off, pins 60 % on the world map, 65 % on the minimap
+  if db.mapHidePvP == nil then db.mapHidePvP = false end
   if db.mapWorld == nil then db.mapWorld = true end
   if db.mapMinimap == nil then db.mapMinimap = true end
-  if db.mapWorldScale == nil then db.mapWorldScale = 1 end -- (Daniel 26.10.) own size of the pins, 25 to 200 %
+  if db.mapWorldScale == nil then db.mapWorldScale = 0.6 end -- (Daniel 26.10.) own size of the pins, 25 to 200 %
   db.mapFaces = nil -- (27.10.) the face pins are gone
-  if db.mapMiniScale == nil then db.mapMiniScale = 1 end
+  if db.mapMiniScale == nil then db.mapMiniScale = 0.65 end
   return db
 end
 
@@ -347,15 +348,20 @@ local function BuildPicker()
   f:SetClampedToScreen(true)
   f:EnableMouse(true)
   f:SetWidth(PICK_W)
-  ns.UI.Skin(f, Style.PAL.popup, { Style.COLORS.background[1], Style.COLORS.background[2], Style.COLORS.background[3], 0.97 })
-  f.title = ns.UI.Text(f, "GameFontNormalSmall", 10, -8, PICK_W - 20, "gold")
-  local line = f:CreateTexture(nil, "ARTWORK")
+  -- (02.11.2026) in the Don style: the kit's card, gold edge, gold title, rows like the lists
+  local Kit = ns.Kit
+  Kit.Fill(f, Kit.C.card)
+  Kit.Border(f, Kit.C.gold)
+  f.title = Kit.Text(f, "group", Kit.C.txGold)
+  f.title:SetPoint("TOPLEFT", f, "TOPLEFT", 10, -8)
+  local line = Kit.Tex(f, "ARTWORK", Kit.C.goldMuted)
   line:SetPoint("TOPLEFT", f, "TOPLEFT", 10, -25)
   line:SetPoint("TOPRIGHT", f, "TOPRIGHT", -10, -25)
   line:SetHeight(1)
-  line:SetColorTexture(1, 1, 1, 0.08)
   f.rows = {}
-  f.hint = ns.UI.Text(f, "GameFontHighlightSmall", 10, 0, PICK_W - 20, "textHint")
+  f.hint = Kit.Text(f, "sub", Kit.C.quiet)
+  f.hint:SetWidth(PICK_W - 20)
+  f.hint:SetMaxLines(4)
   f.hint:SetWordWrap(true)
   f.catcher = CreateFrame("Button", nil, UIParent)
   f.catcher:SetAllPoints(UIParent)
@@ -373,12 +379,14 @@ end
 local function PickRow(f, i)
   local r = f.rows[i]
   if r then return r end
-  r = ns.UI.FlatButton(f, PICK_W - 20, PICK_ROW, "")
-  r:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-  r.label:ClearAllPoints()
+  local Kit = ns.Kit
+  r = CreateFrame("Button", nil, f)
+  r:SetSize(PICK_W - 20, PICK_ROW)
+  r.bg = Kit.Fill(r, Kit.C.card)
+  r.label = Kit.Text(r, "row", Kit.C.title)
   r.label:SetPoint("LEFT", r, "LEFT", 6, 0)
-  r.label:SetWidth(PICK_W - 32)
-  r.label:SetJustifyH("LEFT")
+  Kit.Stateful(r, function(self, st) Kit.SetColor(self.bg, st == "hover" and Kit.C.rowHover or Kit.C.card) end)
+  r:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   r:SetPoint("TOPLEFT", f, "TOPLEFT", 10, -30 - (i - 1) * PICK_ROW)
   r:SetScript("OnClick", function(self, button)
     local name = self.member
@@ -406,6 +414,7 @@ function ns.ShowPicker(pin)
     local r = PickRow(f, i)
     r.member = list[i].name
     r.label:SetText(ns.MemberText(list[i]))
+    ns.Kit.Fit(r.label, PICK_W - 32)
     r:SetAlpha(list[i].name == ns.MyName() and 0.5 or 1)
     r:Show()
   end
