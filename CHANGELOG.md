@@ -1,5 +1,8 @@
 # Changes
 
+## 0.11.2
+- **World map:** a guild member standing under one of Questdon's quest marks can be hovered and clicked again (needs DonMap 1.3.1).
+
 ## 0.11.1
 - **Surnames on WoW Forever, done right:** members are shown with first name and surname in the list, the overview and the map tooltip, and whispers go to the whole name ("Ratloff Ashbloom"). Your own characters keep their data (moved once to the new names).
 - **Map tooltip:** more colour (class in its colour, rank in gold, the level in quest colours) and the clicks on two whole lines.

@@ -759,6 +759,7 @@ local function Source()
   src = DonMapAPI.Register("guildon", {
     title = "Guildon",
     layer = 2, -- world map 2012 (ns.PIN_LEVEL)
+    top = true, -- (05.11.2026, Daniel) on the world map above Questdon's quest pins, so a member can be hovered and clicked
     world = function() return DB().mapWorld end,
     -- (Daniel 26.10.) dungeons and raids: minimap off by default, on with the switch
     minimap = function() local db = DB() return db.mapMinimap and not (InInstance() and not db.mapInstance) end,
