@@ -391,6 +391,33 @@ end
 -- reported time, professions and alts) DonCore's Kit tooltip with a gold edge: class symbol, name, class and rank, the
 -- level on the right; zone, layer (option); one line of clicks. A group: one row per member with symbol and level.
 local GROUP_MAX = 15
+
+-- (05.11.2026, Daniel: "das kann auch noch bisschen mehr farbe bekommen") colours inside the Kit tooltip: the class in
+-- its colour, the rank in gold, the level like the game's quest colours (from grey to red against the own level), and
+-- in the click line the key in gold before its action
+local GOLD, MUTED = "|cffd4af5a", "|cff8792a8"
+local function Hex(c)
+  if type(c) ~= "table" then return nil end
+  local r, g, b = tonumber(c.r or c[1]), tonumber(c.g or c[2]), tonumber(c.b or c[3])
+  if not (r and g and b) then return nil end
+  return ("|cff%02x%02x%02x"):format(math.floor(r * 255 + 0.5), math.floor(g * 255 + 0.5), math.floor(b * 255 + 0.5))
+end
+local function LevelText(level)
+  level = tonumber(level) or 0
+  local hex = level > 0 and type(GetQuestDifficultyColor) == "function" and Hex(ns.Call(GetQuestDifficultyColor, level))
+  return (hex or GOLD) .. level .. "|r"
+end
+local function ClickLine(...)
+  local out = {}
+  for i = 1, select("#", ...) do
+    local part = select(i, ...)
+    local key, act = part:match("^(.-:)%s*(.*)$")
+    out[#out + 1] = key and (GOLD .. key .. "|r " .. act) or part
+  end
+  return table.concat(out, MUTED .. "  ·  |r")
+end
+ns.TooltipClickLine = ClickLine -- (tests)
+
 local function Tooltip(self)
   local list = self.members
   if not list or #list == 0 then return end
@@ -398,25 +425,30 @@ local function Tooltip(self)
   if #list == 1 then
     local m = list[1]
     local mem = ns.Member and ns.Member(m.name)
-    local sub = ClassName(m.p.class)
+    local cls = ClassName(m.p.class)
+    local sub = cls and ("|c" .. ns.ClassHex(m.p.class) .. cls .. "|r") or nil
     local rank = mem and ns.Str(mem.rank)
-    if rank then sub = sub and (sub .. " · " .. rank) or rank end
+    if rank then sub = sub and (sub .. MUTED .. " · |r" .. GOLD .. rank .. "|r") or (GOLD .. rank .. "|r") end
     local lines = {}
     local zone = ZoneName(m.p.map)
-    if zone then lines[#lines + 1] = { L["Zone"], zone } end
-    if ns.ShowLayer() then lines[#lines + 1] = { L["Layer"], LayerLine(m.p) } end
+    if zone then lines[#lines + 1] = { L["Zone"], zone, Kit.C.hero } end
+    if ns.ShowLayer() then lines[#lines + 1] = { L["Layer"], LayerLine(m.p), Kit.C.hero } end
     local clicks
     if m.name ~= ns.MyName() then
-      clicks = L["Click: whisper"] .. "  ·  " .. L["Shift-click: invite"]
+      local arrow
       if ns.ArrowFollowing and ns.ArrowFollowing() == m.name then
         lines[#lines + 1] = { L["Arrow"], L["follows this member"], Kit.C.txGold }
-        clicks = clicks .. "  ·  " .. L["Right-click: arrow off"]
+        arrow = L["Right-click: arrow off"]
       elseif ns.CanArrow and ns.CanArrow() then
-        clicks = clicks .. "  ·  " .. L["Right-click: arrow"]
+        arrow = L["Right-click: arrow"]
       end
+      -- (05.11.2026, Daniel: "in eine Zeile Klick: anflüstern und Rechtsklick: Pfeil und drunter das mit umschalt+klick ...
+      -- dann sieht das nicht so abgebrochen aus") two whole lines instead of one that wraps
+      clicks = (arrow and ClickLine(L["Click: whisper"], arrow) or ClickLine(L["Click: whisper"])) .. "\n"
+        .. ClickLine(L["Shift-click: invite"])
     end
-    Kit.Tooltip(self, { text = ColoredName(m.name, m.p), class = m.p.class, sub = sub, badge = m.p.level or 0 }, lines, clicks,
-      { edge = "gold" })
+    Kit.Tooltip(self, { text = ColoredName(m.name, m.p), class = m.p.class, sub = sub, badge = LevelText(m.p.level) }, lines,
+      clicks, { edge = "gold" })
     return
   end
   local sorted = {}
@@ -425,13 +457,13 @@ local function Tooltip(self)
   local lines, zone = {}, ZoneName(sorted[1].p.map)
   for i = 1, math.min(#sorted, GROUP_MAX) do
     local m = sorted[i]
-    local right = tostring(m.p.level or 0)
-    if ns.ShowLayer() then right = LayerLine(m.p) .. "  |cffd4af5a" .. right .. "|r" end
+    local right = LevelText(m.p.level)
+    if ns.ShowLayer() then right = LayerLine(m.p) .. "  " .. right end
     lines[#lines + 1] = { ColoredName(m.name, m.p), right, Kit.C.txGold, class = m.p.class }
   end
   if #sorted > GROUP_MAX then lines[#lines + 1] = { L["+%d more"]:format(#sorted - GROUP_MAX) } end
   Kit.Tooltip(self, { text = "|cffd4af5a" .. L["%d guild members here"]:format(#list) .. "|r", sub = zone }, lines,
-    L["Click: choose"], { edge = "gold" })
+    ClickLine(L["Click: choose"]), { edge = "gold" })
 end
 
 function ns.MemberText(m)

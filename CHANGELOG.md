@@ -1,5 +1,10 @@
 # Changes
 
+## 0.11.1
+- **Surnames on WoW Forever, done right:** members are shown with first name and surname in the list, the overview and the map tooltip, and whispers go to the whole name ("Ratloff Ashbloom"). Your own characters keep their data (moved once to the new names).
+- **Map tooltip:** more colour (class in its colour, rank in gold, the level in quest colours) and the clicks on two whole lines.
+- **`/gn names`:** shows how the game gives the names (for bug reports).
+
 ## 0.11.0
 - **Map tooltip:** a new look with the class symbol, name, class and rank, the level on the right and the zone; one line with the clicks.
 - **Arrow to a member:** right-click a member's pin (again: off). The arrow follows the member while he moves. It uses DonMap's arrow, or TomTom, or the map pin of the game (option "Arrow to a member").

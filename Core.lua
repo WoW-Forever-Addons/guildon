@@ -108,6 +108,8 @@ function ns.Slash(msg)
     if ns.PrintDiag then ns.PrintDiag() end
   elseif msg == "layer" then
     if ns.LayerDiag then ns.LayerDiag() end
+  elseif msg == "names" or msg == "namen" then
+    ns.NamesDiag()
   elseif msg == "wishes" or msg == "wish" or msg == "wünsche" or msg == "export" or msg == "recipes" or msg == "rezepte" then
     -- (C3) these moved to Guildon Crafts with the professions
     ns.Print(L["This is in Guildon Crafts now: /gnc %s"]:format(msg == "wünsche" and "wishes" or (msg == "rezepte" and "recipes" or msg)))
@@ -117,6 +119,29 @@ function ns.Slash(msg)
     ns.Print(L["Unknown command: %s"]:format(msg))
     ns.PrintHelp()
   end
+end
+
+-- (05.11.2026, WoW Forever's surnames) what the game gives as names: the player, the realm, the first roster rows and
+-- the last senders of addon messages; printed and kept in GuildonDB.namesDiag (read after a /reload)
+function ns.NamesDiag()
+  local function S(...)
+    local t = {}
+    for i = 1, select("#", ...) do t[#t + 1] = "[" .. tostring((select(i, ...))) .. "]" end
+    return table.concat(t, " ")
+  end
+  local out = {}
+  out[#out + 1] = "UnitName " .. S(ns.Call(UnitName, "player"))
+  out[#out + 1] = "UnitFullName " .. S(ns.Call(UnitFullName, "player"))
+  out[#out + 1] = "GetRealmName " .. S(ns.Call(GetRealmName)) .. " normalized " .. S(ns.Call(GetNormalizedRealmName))
+  out[#out + 1] = "ShouldDisplaySurname " .. S(C_PlayerInfo and C_PlayerInfo.ShouldDisplaySurname and ns.Call(C_PlayerInfo.ShouldDisplaySurname))
+  out[#out + 1] = "MyName " .. S(ns.MyName())
+  local n = ns.Call(GetNumGuildMembers) or 0
+  for i = 1, math.min(tonumber(n) or 0, 5) do out[#out + 1] = "roster " .. i .. " " .. S(ns.Call(GetGuildRosterInfo, i)) end
+  local raw = ns.rawSenders or { n = 0 }
+  for i = 1, raw.n do out[#out + 1] = "sender " .. S(raw[i], raw[raw[i]]) end
+  if UnitExists and ns.Call(UnitExists, "target") then out[#out + 1] = "target " .. S(ns.Call(UnitName, "target")) .. " full " .. S(ns.Call(UnitFullName, "target")) end
+  for _, line in ipairs(out) do ns.Print(line) end
+  if ns.db then ns.db.namesDiag = out end
 end
 
 SlashCmdList["GUILDON"] = function(msg) ns.SafeCall("slash", ns.Slash, msg) end

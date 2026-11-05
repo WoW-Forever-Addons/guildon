@@ -1,4 +1,4 @@
-# Guildon: Map & Members 0.11.0 (WoW Forever und WoW Classic Era)
+# Guildon: Map & Members 0.11.1 (WoW Forever und WoW Classic Era)
 
 Teil von Guildon, den Addons für die Gilde: Gildenmitglieder auf der Karte, Mitgliederliste mit Klassen und Twinks, Pfeil zu einem Mitglied.
 Für World of Warcraft: Forever (Client "Camelot", Interface 16001) und WoW Classic Era (Interface 11509).
