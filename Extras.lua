@@ -8,7 +8,7 @@ local Style = ns.Style
 --  7 alts: own characters of one account linked ("alts"), whispers go to the one who is online
 --  8 member tooltip: last seen, alts; Guildon Crafts adds the professions through GuildonAPI.AddMemberLines
 --  9 guild emblem next to the window title (Forever: C_GuildInfo.GetGuildTabardInfo)
--- 11 the arrow to a member on the map (DonMap, Questdon with an older DonMap)
+-- 11 the arrow to a member on the map (DonMap, Questdon with an older DonMap, TomTom, the game's map pin), following him
 -- whisper and invite a member (were in Professions.lua)
 ---------------------------------------------------------------------------
 
@@ -174,22 +174,193 @@ end
 
 
 ---------------------------------------------------------------------------
--- 11 The arrow to a member: DonMap's (M2, a click wins over a guide's step), Questdon's with an older DonMap
+-- 11 The arrow to a member. (04.11.2026, Daniel: TomTom too, and an arrow that follows the member) The ways, with
+-- db.mapArrow "auto": DonMap's arrow while it is on (M2, a click wins over a guide's step), Questdon's with an older
+-- DonMap, TomTom, the game's own map pin (C_Map.SetUserWaypoint, tracked); "donmap", "tomtom", "blizzard" pick one.
+-- The arrow follows: each new position of the member moves the target (Map.lua calls ns.ArrowMoved, and asks the member
+-- for his position with "W:f:<name>" while the world map is closed). It ends when the member logs out, hides or no
+-- longer sends his position, or the player drops or replaces the target.
 ---------------------------------------------------------------------------
+local follow = { name = nil, way = nil, target = nil, uid = nil }
+
 local function DonMapArrow()
   local api = DonMapAPI
   return type(api) == "table" and (tonumber(api.version) or 0) >= 2 and type(api.SetArrowTarget) == "function" and api or nil
 end
-function ns.CanArrow()
-  return DonMapArrow() ~= nil or (type(QuestdonAPI) == "table" and type(QuestdonAPI.SetArrowTarget) == "function")
-end
-function ns.ArrowTo(name)
-  local p = ns.Positions and ns.Positions()[name]
-  if not p then return false end
-  local target = { mapID = p.map, x = p.x, y = p.y, label = ns.ShortName(name) }
-  local dm = DonMapArrow()
-  if dm then return (pcall(dm.SetArrowTarget, "guildon", target, dm.PRIO and dm.PRIO.click or 3)) end
+local function QuestdonArrow()
   local api = QuestdonAPI
-  if type(api) ~= "table" or type(api.SetArrowTarget) ~= "function" then return false end
-  return pcall(api.SetArrowTarget, target)
+  return type(api) == "table" and type(api.SetArrowTarget) == "function" and api or nil
 end
+local function TomTomArrow()
+  local tt = TomTom
+  return type(tt) == "table" and type(tt.AddWaypoint) == "function" and tt or nil
+end
+local function BlizzardPin()
+  return type(C_Map) == "table" and type(C_Map.SetUserWaypoint) == "function" and type(UiMapPoint) == "table"
+    and type(UiMapPoint.CreateFromCoordinates) == "function"
+end
+
+ns.ARROW_WAYS = { "auto", "donmap", "tomtom", "blizzard" }
+function ns.ArrowHas(way)
+  if way == "auto" then return true end
+  if way == "donmap" then return DonMapArrow() ~= nil end
+  if way == "questdon" then return QuestdonArrow() ~= nil end
+  if way == "tomtom" then return TomTomArrow() ~= nil end
+  if way == "blizzard" then return BlizzardPin() and true or false end
+  return false
+end
+
+function ns.ArrowWay()
+  local pick = ns.db and ns.db.mapArrow or "auto"
+  if pick ~= "auto" and ns.ArrowHas(pick) then return pick end
+  local dm = DonMapArrow()
+  if dm and (type(dm.ArrowRuns) ~= "function" or dm.ArrowRuns()) then return "donmap" end
+  if not dm and QuestdonArrow() then return "questdon" end
+  if TomTomArrow() then return "tomtom" end
+  if BlizzardPin() then return "blizzard" end
+  if dm then return "donmap" end -- DonMap's arrow is off: it keeps the target for when it is switched on
+end
+
+function ns.CanArrow() return ns.ArrowWay() ~= nil end
+
+local function Target(name)
+  local p = ns.Positions and ns.Positions()[name]
+  if not p then return nil end
+  return { mapID = p.map, x = p.x, y = p.y, label = ns.ShortName(name) }
+end
+
+local function BlizzardIsOurs(t)
+  local pt = ns.Call(C_Map.GetUserWaypoint)
+  local pos = type(pt) == "table" and pt.position
+  return pos ~= nil and t ~= nil and pt.uiMapID == t.mapID and math.abs((pos.x or 0) - t.x) < 0.0001
+    and math.abs((pos.y or 0) - t.y) < 0.0001
+end
+
+-- the target is still ours (not dropped, replaced or reached and cleared)
+local function StillOurs()
+  local way, t = follow.way, follow.target
+  if way == "donmap" then
+    local dm = DonMapArrow()
+    if not (dm and type(dm.ArrowTarget) == "function") then return false end
+    local ok, _, src = pcall(dm.ArrowTarget)
+    return ok and (src == "guildon" or src == "corpse")
+  elseif way == "questdon" then
+    local api = QuestdonArrow()
+    local st = api and type(api.ArrowState) == "function" and ns.Call(api.ArrowState)
+    return type(st) == "table" and st.hasTarget == true and st.label == (t and t.label)
+  elseif way == "tomtom" then
+    local tt = TomTomArrow()
+    if not (tt and follow.uid) then return false end
+    if type(tt.IsValidWaypoint) ~= "function" then return true end
+    local ok, valid = pcall(tt.IsValidWaypoint, tt, follow.uid)
+    return ok and valid and true or false
+  elseif way == "blizzard" then
+    return BlizzardPin() and BlizzardIsOurs(t) or false
+  end
+  return false
+end
+
+local function Set(way, t)
+  if way == "donmap" then
+    local dm = DonMapArrow()
+    return dm ~= nil and pcall(dm.SetArrowTarget, "guildon", t, dm.PRIO and dm.PRIO.click or 3)
+  elseif way == "questdon" then
+    local api = QuestdonArrow()
+    return api ~= nil and pcall(api.SetArrowTarget, t)
+  elseif way == "tomtom" then
+    local tt = TomTomArrow()
+    if not tt then return false end
+    local old = follow.way == "tomtom" and follow.uid or nil
+    local ok, uid = pcall(tt.AddWaypoint, tt, t.mapID, t.x, t.y, { title = t.label, from = "Guildon", persistent = false,
+      minimap = true, world = true, crazy = true, silent = true })
+    if not ok or not uid then return false end
+    if old and old ~= uid and type(tt.RemoveWaypoint) == "function" then pcall(tt.RemoveWaypoint, tt, old) end
+    follow.uid = uid
+    return true
+  elseif way == "blizzard" then
+    if not BlizzardPin() then return false end
+    if type(C_Map.CanSetUserWaypointOnMap) == "function" and not ns.Call(C_Map.CanSetUserWaypointOnMap, t.mapID) then return false end
+    local okP, pt = pcall(UiMapPoint.CreateFromCoordinates, t.mapID, t.x, t.y)
+    if not okP or not pt or not pcall(C_Map.SetUserWaypoint, pt) then return false end
+    if type(C_SuperTrack) == "table" and type(C_SuperTrack.SetSuperTrackedUserWaypoint) == "function" then
+      ns.Call(C_SuperTrack.SetSuperTrackedUserWaypoint, true)
+    end
+    return true
+  end
+  return false
+end
+
+local function Release()
+  local way = follow.way
+  if way == "donmap" then
+    local dm = DonMapArrow()
+    if dm then pcall(dm.SetArrowTarget, "guildon", nil) end
+  elseif way == "questdon" then
+    local api = QuestdonArrow()
+    if api and StillOurs() then pcall(api.SetArrowTarget, nil) end
+  elseif way == "tomtom" then
+    local tt = TomTomArrow()
+    if tt and follow.uid and type(tt.RemoveWaypoint) == "function" then pcall(tt.RemoveWaypoint, tt, follow.uid) end
+  elseif way == "blizzard" then
+    if BlizzardPin() and BlizzardIsOurs(follow.target) then ns.Call(C_Map.ClearUserWaypoint) end
+  end
+end
+
+local function Forget() follow.name, follow.way, follow.target, follow.uid, follow.arrivedSince = nil, nil, nil, nil, nil end
+
+function ns.ArrowTo(name)
+  local t = Target(name)
+  local way = t and ns.ArrowWay()
+  if not way then return false end
+  if follow.name and follow.way ~= way then Release() end
+  if not Set(way, t) then return false end
+  follow.name, follow.way, follow.target = name, way, t
+  return true
+end
+
+-- the member the arrow follows now (nil: none, or the player dropped the target)
+function ns.ArrowFollowing()
+  if follow.name and not StillOurs() then Forget() end
+  return follow.name
+end
+
+-- name: stop only when the arrow follows him
+function ns.ArrowStop(name)
+  if not follow.name or (name and name ~= follow.name) then return end
+  Release()
+  Forget()
+end
+
+-- right-click on a member: arrow on, or off when it already follows him
+function ns.ArrowToggle(name)
+  if name and ns.ArrowFollowing() == name then ns.ArrowStop() return true end
+  return ns.ArrowTo(name)
+end
+
+-- Map.lua: a new position of a member arrived
+function ns.ArrowMoved(name)
+  if not follow.name or name ~= follow.name then return end
+  if not StillOurs() then Forget() return end
+  local t, old = Target(name), follow.target
+  if not t then ns.ArrowStop() return end
+  if old and t.mapID == old.mapID and t.x == old.x and t.y == old.y then return end
+  if Set(follow.way, t) then follow.target = t end
+end
+
+-- (05.11.2026, Daniel: "der pfeil lässt sich nach ankunft nicht mehr auf eine quest machen", only a right-click on the
+-- arrow dropped it) arrived at the member: the clicked target goes after a short look at "Arrived", so a guide's or
+-- Questdon's step gets the arrow back. Map.lua calls this every second.
+local ARRIVED_YARDS, ARRIVED_HOLD = 8, 2
+function ns.ArrowCheckArrived(now)
+  local t = follow.name and follow.target
+  if not t then follow.arrivedSince = nil return false end
+  local api = DonMapAPI
+  local dist = type(api) == "table" and type(api.DistanceTo) == "function" and ns.Call(api.DistanceTo, t.mapID, t.x, t.y)
+  if type(dist) ~= "number" or dist >= ARRIVED_YARDS then follow.arrivedSince = nil return false end
+  follow.arrivedSince = follow.arrivedSince or now
+  if now - follow.arrivedSince < ARRIVED_HOLD then return false end
+  ns.ArrowStop()
+  return true
+end
+
+function ns.ArrowState() return follow end -- (tests)

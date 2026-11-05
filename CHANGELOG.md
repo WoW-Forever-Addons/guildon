@@ -1,5 +1,13 @@
 # Changes
 
+## 0.11.0
+- **Map tooltip:** a new look with the class symbol, name, class and rank, the level on the right and the zone; one line with the clicks.
+- **Arrow to a member:** right-click a member's pin (again: off). The arrow follows the member while he moves. It uses DonMap's arrow, or TomTom, or the map pin of the game (option "Arrow to a member").
+- **Logging out:** a member who logs out leaves the map at once.
+- **Layer:** layer numbers now count the layers the guild reports; `/gn layer` shows what the layer reading sees.
+- **Arrow after arriving:** once you reach the member, the arrow shows "Arrived" for a moment and then goes back to your quest or guide.
+- **Surnames on WoW Forever:** your own name is now recognised with a surname. You no longer see yourself on the map, and the chat no longer says that a player "Name Surname-Realm" is not online.
+
 ## 0.10.0
 - **The Don look:** the window you can drag from 720x420 to 1300x900 with the shared look of the Don addons: Overview with tiles, Members with sortable columns, filters All / Online / With Guildon, class symbols, right-click to invite and a census (classes, levels, online by zone; click a class to filter), Map with zones to fold, the member on the map, arrow and whisper.
 - **Options in the Don family window** (`/gn options`); the Options tab is gone. Locking, hiding in combat and Shift-scaling the window are gone.

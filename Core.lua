@@ -81,6 +81,7 @@ ns.COMMANDS = {
   { "/gn options", "all settings (also the cog in the window)" },
   { "/gn sync", "ask the guild for new data now" },
   { "/gn diag", "state of the exchange and errors" },
+  { "/gn layer", "what the layer reading sees (target a creature first)" },
   { "/gn demo", "example guild to try the windows (again: off)" },
   { "/gn help", "this list" },
 }
@@ -105,6 +106,8 @@ function ns.Slash(msg)
     if ns.SetDemo then ns.SetDemo(msg == "demo off" and false or (msg == "demo on" and true or not ns.demo)) end
   elseif msg == "diag" then
     if ns.PrintDiag then ns.PrintDiag() end
+  elseif msg == "layer" then
+    if ns.LayerDiag then ns.LayerDiag() end
   elseif msg == "wishes" or msg == "wish" or msg == "wünsche" or msg == "export" or msg == "recipes" or msg == "rezepte" then
     -- (C3) these moved to Guildon Crafts with the professions
     ns.Print(L["This is in Guildon Crafts now: /gnc %s"]:format(msg == "wünsche" and "wishes" or (msg == "rezepte" and "recipes" or msg)))

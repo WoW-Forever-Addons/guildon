@@ -88,8 +88,14 @@ end
 local function Watched()
   local now = GetTime()
   local c0, n0, w0
+  local me = ns.MyName()
   for name, v in pairs(watchers) do
-    if now - v.t > WATCH_KEEP then watchers[name] = nil
+    -- (04.11.2026) "W:f:<name>": his arrow follows one member; only that member counts it
+    if v.f and now - v.ft > WATCH_KEEP then v.f = nil end
+    if v.t and now - v.t > WATCH_KEEP then v.t = nil end
+    if v.f and v.f == me then return true end
+    if not v.t then
+      if not v.f then watchers[name] = nil end
     elseif not v.c then return true
     else
       if c0 == nil then c0, n0, w0 = WorldNow() c0 = c0 or false end
@@ -102,6 +108,15 @@ end
 -- tell the guild what this client shows: a plain W while the world map is open, W:m with the place for minimap dots
 local function SendWatch(now, db)
   if not ns.InGuild() then return end
+  -- (04.11.2026) the arrow follows a member: he sends his position although no map shows him (an older Guildon reads
+  -- this as a plain W)
+  local follow = ns.ArrowFollowing and ns.ArrowFollowing()
+  if follow and (last.followName ~= follow or now - (last.followSent or -100) >= WATCH_EVERY) then
+    last.followName, last.followSent = follow, now
+    ns.Send("W:f:" .. follow, "GUILD")
+  elseif not follow then
+    last.followName = nil
+  end
   if db.mapWorld and WorldMapFrame and WorldMapFrame.IsShown and WorldMapFrame:IsShown() then
     if last.watchKind ~= "world" or now - last.watchSent >= WATCH_EVERY then
       last.watchKind, last.watchSent = "world", now
@@ -128,6 +143,7 @@ end
 local function Tick()
   local now = GetTime()
   local db = DB()
+  if ns.ArrowCheckArrived then ns.ArrowCheckArrived(now) end -- (05.11.2026) arrived at the member: the arrow is free again
   -- watching: tell the others while the world map is open or minimap dots are on
   SendWatch(now, db)
   local chat = Channel()
@@ -156,6 +172,8 @@ end
 ns.MSG.W = function(sender, rest)
   local v = watchers[sender]
   if not v then v = {} watchers[sender] = v end
+  local only = (rest or ""):match("^f:(.+)$")
+  if only then v.f, v.ft = only, GetTime() return end
   v.t, v.c, v.n, v.w = GetTime(), nil, nil, nil
   local map, x, y = (rest or ""):match("^m:(%d+):(%d+):(%d+)$")
   if map and DonMapAPI and DonMapAPI.WorldPos then -- an unknown place counts as the world map: everyone sends
@@ -167,6 +185,7 @@ end
 ns.MSG.P = function(sender, rest)
   if rest == "0" then
     if positions[sender] then positions[sender] = nil version = version + 1 end
+    if ns.ArrowStop then ns.ArrowStop(sender) end
     return
   end
   local map, x, y, lv, cls, layer = rest:match("^(%d+):(%d+):(%d+):(%d+):(%d+):?(%d*):?%d*:?%d*$")
@@ -177,15 +196,41 @@ ns.MSG.P = function(sender, rest)
   if not p then p = {} positions[sender] = p end
   if p.map ~= map or p.x ~= x or p.y ~= y or p.level ~= lv or p.class ~= cls or p.layer ~= layer then version = version + 1 end
   p.map, p.x, p.y, p.level, p.class, p.layer, p.t = map, x, y, lv, cls, layer, GetTime()
+  -- (04.11.2026, layer check) the layers of the guild count for the numbering too, so "layer 2" means the same for all
+  -- who hear the same members (before: only the layers this client read itself)
+  if layer and ns.SeeLayer then ns.SeeLayer(map, layer) end
+  if ns.ArrowMoved then ns.ArrowMoved(sender) end
 end
 
 -- old positions and those of members who left go; once a second, without new tables
 local function Expire()
   local now = GetTime()
   for name, p in pairs(positions) do
-    if now - p.t > POS_KEEP or not ns.IsMember(name) then positions[name] = nil version = version + 1 end
+    if now - p.t > POS_KEEP or not ns.IsMember(name) then
+      positions[name] = nil
+      version = version + 1
+      if ns.ArrowStop then ns.ArrowStop(name) end
+    end
   end
 end
+
+-- (04.11.2026, Daniel: "sofort beim Ausloggen") a member who logs out leaves the map at once (before: up to POS_KEEP);
+-- the game's "<name> has gone offline." and the roster (GuildShared/Guild.lua ns.OnMemberOffline) both tell it
+function ns.OnMemberOffline(name)
+  if positions[name] then positions[name] = nil version = version + 1 end
+  if watchers[name] then watchers[name] = nil end
+  if ns.ArrowStop then ns.ArrowStop(name) end
+end
+local offlinePattern
+ns.On("CHAT_MSG_SYSTEM", function(_, text)
+  if type(text) ~= "string" or type(ERR_FRIEND_OFFLINE_S) ~= "string" then return end
+  offlinePattern = offlinePattern or ("^" .. ERR_FRIEND_OFFLINE_S:gsub("[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%0"):gsub("%%%%s", "(.+)") .. "$")
+  local who = text:match(offlinePattern)
+  if not who then return end
+  who = who:match("|h%[(.-)%]|h") or who
+  local full = ns.FullName(who)
+  if full and ns.IsMember(full) then ns.OnMemberOffline(full) end
+end)
 
 -- members on the map (demo members of /gn demo included), old positions dropped
 function ns.Positions()
@@ -219,6 +264,7 @@ local function SeeLayer(map, id)
   layersSeen[map] = layersSeen[map] or {}
   layersSeen[map][id] = true
 end
+ns.SeeLayer = SeeLayer
 
 function ns.ReadLayer(unit)
   local g = ns.Str(ns.Call(UnitGUID, unit))
@@ -237,6 +283,29 @@ end
 function ns.MyLayer()
   local map = ns.PlayerMapPos()
   if map and myLayer.map == map then return myLayer.id end
+end
+
+-- (04.11.2026, Daniel: "Layer müssen wir nochmal gucken") /gn layer: what the layer reading sees now, to check in the game
+-- whether Forever's GUIDs still tell the layer (since 1.60.1 build 70425 the server and spawn parts are scrambled per
+-- session; the zone part, which is read here, is not named). Two characters on different layers target the same kind of
+-- creature: different zone IDs mean it works.
+function ns.LayerDiag()
+  local g = ns.Str(ns.Call(UnitGUID, "target"))
+  local map = ns.PlayerMapPos()
+  ns.Print(L["Layer check"] .. ": " .. L["map %s"]:format(tostring(map or "?")))
+  if g then
+    local kind, _, server, inst, zone = g:match("^(%a+)%-(%d+)%-(%d+)%-(%d+)%-(%d+)%-")
+    ns.Print(("  target %s: server %s, instance %s, zone %s"):format(tostring(kind or g), tostring(server), tostring(inst), tostring(zone)))
+  else
+    ns.Print("  " .. L["Target a creature to read its layer."])
+  end
+  local id = ns.MyLayer()
+  ns.Print("  " .. (id and L["Your layer: %s (number %s)"]:format(tostring(id), tostring(ns.LayerNumber(map, id) or "?"))
+    or L["Layer: unknown"]))
+  local ids = {}
+  for k in pairs(map and layersSeen[map] or {}) do ids[#ids + 1] = k end
+  table.sort(ids)
+  ns.Print("  " .. L["Layers seen here: %s"]:format(#ids > 0 and table.concat(ids, ", ") or "-"))
 end
 
 -- number of a layer on a map (1, 2, ...), nil when unknown
@@ -308,31 +377,71 @@ local function ColoredName(name, p)
   return "|c" .. ns.ClassHex(p.class) .. ns.ShortName(name) .. "|r"
 end
 
+local function ZoneName(map)
+  local zone = C_Map and C_Map.GetMapInfo and ns.Call(C_Map.GetMapInfo, map)
+  return type(zone) == "table" and ns.Str(zone.name) or nil
+end
+
+-- the game's name of a class ("Mage", "Magier"); LOCALIZED_CLASS_NAMES_FEMALE is not used: the message has no sex
+local function ClassName(cls)
+  return type(LOCALIZED_CLASS_NAMES_MALE) == "table" and LOCALIZED_CLASS_NAMES_MALE[cls or ""] or nil
+end
+
+-- (04.11.2026, Daniel: "der Tooltip sieht einfach aus", mockup D:\Downloads\2026-11-04_guildon_tooltip; without distance,
+-- reported time, professions and alts) DonCore's Kit tooltip with a gold edge: class symbol, name, class and rank, the
+-- level on the right; zone, layer (option); one line of clicks. A group: one row per member with symbol and level.
+local GROUP_MAX = 15
 local function Tooltip(self)
   local list = self.members
   if not list or #list == 0 then return end
+  local Kit = ns.Kit
   if #list == 1 then
     local m = list[1]
-    local zone = C_Map and C_Map.GetMapInfo and ns.Call(C_Map.GetMapInfo, m.p.map)
-    local lines = { L["Level %d"]:format(m.p.level or 0) }
-    if type(zone) == "table" and ns.Str(zone.name) then lines[#lines + 1] = ns.Str(zone.name) end
-    if ns.ShowLayer() then lines[#lines + 1] = LayerLine(m.p) end
-    if m.name ~= ns.MyName() then lines[#lines + 1] = L["Shift-click: invite to your group"] end
-    Style.Tooltip(self, ColoredName(m.name, m.p), lines, m.name ~= ns.MyName() and L["Click: whisper"] or nil)
+    local mem = ns.Member and ns.Member(m.name)
+    local sub = ClassName(m.p.class)
+    local rank = mem and ns.Str(mem.rank)
+    if rank then sub = sub and (sub .. " · " .. rank) or rank end
+    local lines = {}
+    local zone = ZoneName(m.p.map)
+    if zone then lines[#lines + 1] = { L["Zone"], zone } end
+    if ns.ShowLayer() then lines[#lines + 1] = { L["Layer"], LayerLine(m.p) } end
+    local clicks
+    if m.name ~= ns.MyName() then
+      clicks = L["Click: whisper"] .. "  ·  " .. L["Shift-click: invite"]
+      if ns.ArrowFollowing and ns.ArrowFollowing() == m.name then
+        lines[#lines + 1] = { L["Arrow"], L["follows this member"], Kit.C.txGold }
+        clicks = clicks .. "  ·  " .. L["Right-click: arrow off"]
+      elseif ns.CanArrow and ns.CanArrow() then
+        clicks = clicks .. "  ·  " .. L["Right-click: arrow"]
+      end
+    end
+    Kit.Tooltip(self, { text = ColoredName(m.name, m.p), class = m.p.class, sub = sub, badge = m.p.level or 0 }, lines, clicks,
+      { edge = "gold" })
     return
   end
-  local lines = {}
-  for _, m in ipairs(list) do lines[#lines + 1] = ns.MemberText(m) end
-  Style.Tooltip(self, L["%d guild members here"]:format(#list), lines, L["Click: choose"])
+  local sorted = {}
+  for i, m in ipairs(list) do sorted[i] = m end
+  table.sort(sorted, function(a, b) return ns.ShortName(a.name) < ns.ShortName(b.name) end)
+  local lines, zone = {}, ZoneName(sorted[1].p.map)
+  for i = 1, math.min(#sorted, GROUP_MAX) do
+    local m = sorted[i]
+    local right = tostring(m.p.level or 0)
+    if ns.ShowLayer() then right = LayerLine(m.p) .. "  |cffd4af5a" .. right .. "|r" end
+    lines[#lines + 1] = { ColoredName(m.name, m.p), right, Kit.C.txGold, class = m.p.class }
+  end
+  if #sorted > GROUP_MAX then lines[#lines + 1] = { L["+%d more"]:format(#sorted - GROUP_MAX) } end
+  Kit.Tooltip(self, { text = "|cffd4af5a" .. L["%d guild members here"]:format(#list) .. "|r", sub = zone }, lines,
+    L["Click: choose"], { edge = "gold" })
 end
 
 function ns.MemberText(m)
-  return ColoredName(m.name, m.p) .. "  |cff9ea3ad" .. (m.p.level or 0) .. "|r" .. (ns.ShowLayer() and ("  " .. LayerLine(m.p)) or "")
+  return ns.Kit.IconText({ class = m.p.class }, 14) .. ColoredName(m.name, m.p) .. "  |cff9ea3ad" .. (m.p.level or 0) .. "|r"
+    .. (ns.ShowLayer() and ("  " .. LayerLine(m.p)) or "")
 end
 
 ---------------------------------------------------------------------------
 -- The pick list of a group pin (Daniel 26.10.: "wenn mehrere auf dem Haufen sind, nicht nur den 1. anwhispern, sondern eine
--- Auswahl"): a click on a group opens it, a click on a name whispers, a right-click shows Questdon's arrow. Own frame; a
+-- Auswahl"): a click on a group opens it, a click on a name whispers, a right-click sets the arrow (again: off). Own frame; a
 -- see-through button behind it closes it by a click anywhere else, Esc closes it too.
 ---------------------------------------------------------------------------
 local PICK_W, PICK_ROW, PICK_MAX = 270, 20, 20
@@ -392,7 +501,7 @@ local function PickRow(f, i)
     local name = self.member
     if not name or name == ns.MyName() then return end
     if button == "RightButton" then
-      if ns.ArrowTo and ns.ArrowTo(name) then HidePicker() end
+      if ns.ArrowToggle and ns.ArrowToggle(name) then HidePicker() end
     else
       if IsShiftKeyDown and IsShiftKeyDown() then ns.InviteMember(name)
       elseif ns.WhisperMember then ns.WhisperMember(name) end
@@ -469,12 +578,20 @@ local function NewPin(parent, size)
   b.count = b:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
   b.count:SetPoint("CENTER", b.badge, "CENTER", 0, 0)
   b:SetScript("OnEnter", Tooltip)
-  b:SetScript("OnLeave", function(self) Style.HideTooltip(self) end)
-  b:SetScript("OnClick", function(self)
+  b:SetScript("OnLeave", function(self) ns.Kit.HideTooltip(self) end)
+  -- (04.11.2026) right-click: the arrow to the member (on a group: the pick list, its rows take the right-click)
+  b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  b:SetScript("OnClick", function(self, button)
     local list = self.members
-    if list and #list > 1 then Style.HideTooltip(self) ns.ShowPicker(self) return end -- a group: choose
+    if list and #list > 1 then ns.Kit.HideTooltip(self) ns.ShowPicker(self) return end -- a group: choose
     local m = list and list[1]
     if not m or m.name == ns.MyName() then return end
+    if button == "RightButton" then
+      if ns.ArrowToggle then ns.ArrowToggle(m.name) end
+      local okM, over = pcall(self.IsMouseOver, self)
+      if okM and over then Tooltip(self) end -- the click line changes (arrow on / off)
+      return
+    end
     if IsShiftKeyDown and IsShiftKeyDown() then ns.InviteMember(m.name) -- Shift: invite to the group
     elseif ns.WhisperMember then ns.WhisperMember(m.name) end
   end)
@@ -631,12 +748,15 @@ local function Source()
   return src
 end
 
--- the members on the map as DonMap points (the member's own data stays on the point: name, p); not myself on the minimap
+-- the members on the map as DonMap points (the member's own data stays on the point: name, p); not myself (05.11.2026,
+-- Daniel: "man sieht sich selber auf der karte"; the game draws the player's own arrow, before: only off the minimap)
 local function Points()
   local list, me = {}, ns.MyName()
   for name, p in pairs(ns.Positions()) do
-    list[#list + 1] = { mapID = p.map, x = p.x, y = p.y, key = name, name = name, p = p, minimap = name ~= me,
-      sig = (p.level or 0) .. (p.class or "") .. (p.layer or "") }
+    if name ~= me then
+      list[#list + 1] = { mapID = p.map, x = p.x, y = p.y, key = name, name = name, p = p,
+        sig = (p.level or 0) .. (p.class or "") .. (p.layer or "") }
+    end
   end
   return list
 end

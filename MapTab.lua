@@ -83,7 +83,7 @@ local function FillDetail(p, d, e)
   d:SetHead({ level = pos.level, levelStatus = "grey", title = "|c" .. cls .. ns.ShortName(name) .. "|r",
     meta = (LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[pos.class or ""]) or "" })
   local acts = { { text = L["On the map"], kind = "primary", onClick = function() ns.ShowOnMap(name) end } }
-  if ns.CanArrow and ns.CanArrow() then acts[#acts + 1] = { text = L["Arrow"], onClick = function() ns.ArrowTo(name) end } end
+  if ns.CanArrow and ns.CanArrow() then acts[#acts + 1] = { text = L["Arrow"], onClick = function() ns.ArrowToggle(name) end } end
   if name ~= ns.MyName() then acts[#acts + 1] = { text = L["Whisper"], onClick = function() ns.WhisperMember(name) end } end
   d:SetActions(acts)
   d:Begin()
@@ -128,7 +128,7 @@ ns.PAGE_BUILDERS.map = function(p)
     end,
     onClick = function(e, button)
       if not e.name then return end
-      if button == "RightButton" then if ns.ArrowTo then ns.ArrowTo(e.name) end return end
+      if button == "RightButton" then if ns.ArrowToggle then ns.ArrowToggle(e.name) end return end
       p.picked = e.name
       p.list:Select(e)
       ns.Relayout()

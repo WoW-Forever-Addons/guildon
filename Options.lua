@@ -12,12 +12,14 @@ local Opt = LibStub("DonCore-1.0"):Get("Options", 2)
 local SHARE_TEXT = { guild = "With the guild", group = "Only with my group", off = "Off" }
 -- (Daniel 26.10.) the look of the pins; texts for guildon_keys.py
 local PIN_STYLE_TEXT = { emblem = "Guild sign", shield = "Shield only", dot = "Plain dot" }
+-- (04.11.2026, Daniel: TomTom too) which arrow leads to a member (Extras.lua ns.ArrowWay); texts for guildon_keys.py
+local ARROW_TEXT = { auto = "Automatic", donmap = "DonMap arrow", tomtom = "TomTom", blizzard = "Map pin of the game" }
 
 -- (04.11.2026, Era-Test) Daniel 04.11.: map icon size 60 %, minimap icon size 65 %, hide while flagged for PvP off by default
 -- (Core.lua ns.MigrateDB moves saved values still on the old defaults once)
 ns.OPTION_DEFAULTS = {
   mapShare = "guild", mapHidePvP = false, mapWorld = true, mapMinimap = true, mapInstance = false, mapLayer = false,
-  pinStyle = "emblem", mapWorldScale = 0.6, mapMiniScale = 0.65, mapPinAlpha = 1, minimapButton = true,
+  pinStyle = "emblem", mapWorldScale = 0.6, mapMiniScale = 0.65, mapPinAlpha = 1, minimapButton = true, mapArrow = "auto",
 }
 
 local function Percent(v) return ("%d %%"):format(math.floor((tonumber(v) or 0) * 100 + 0.5)) end
@@ -52,6 +54,15 @@ local ITEMS = {
     tip = "How see-through the guild pins on the world map and the minimap are. 100 % is fully visible." },
   { key = "mapLayer", name = "Show the layer",
     tip = "The layer (server copy of the zone) of each member in the tooltips and lists, compared with yours. Off by default." },
+  { key = "mapArrow", name = "Arrow to a member", kind = "dropdown",
+    tip = "Right-click on a member on the map: this arrow leads you to him and follows him while he moves. Automatic: DonMap's arrow while it is on, otherwise TomTom, otherwise the map pin of the game.",
+    options = function()
+      local out = {}
+      for _, k in ipairs(ns.ARROW_WAYS or { "auto" }) do
+        if k == "auto" or k == "donmap" or (ns.ArrowHas and ns.ArrowHas(k)) then out[#out + 1] = { k, L[ARROW_TEXT[k]] } end
+      end
+      return out
+    end },
   { header = "Window" },
   { key = "minimapButton", name = "Minimap button", tip = "Shows the Guildon button at the minimap. All Guildon parts share it." },
   { kind = "button", optKey = "button:resetWindow", name = "Reset window position", button = "Reset",
@@ -102,7 +113,7 @@ local function Register()
       { key = "map", title = "Map", icon = "Interface\\Icons\\INV_Misc_Map_01", preview = Preview,
         text = "Who sees you on the map, and how the guild members look on the world map and the minimap.",
         main = { "header:Sharing", "mapShare", "mapHidePvP", "mapInstance", "header:Pins", "mapWorld", "mapMinimap", "pinStyle",
-          "mapWorldScale", "mapMiniScale", "mapPinAlpha" }, more = { "mapLayer" } },
+          "mapWorldScale", "mapMiniScale", "mapPinAlpha" }, more = { "mapArrow", "mapLayer" } },
       { key = "window", title = "Window", icon = "Interface\\Icons\\INV_Misc_GroupNeedMore",
         text = "The minimap button of all Guildon parts and the place of the window.",
         main = { "minimapButton", "button:resetWindow" } },
@@ -118,6 +129,7 @@ local function Register()
     db = function() return ns.db end,
     default = function(key) return ns.OPTION_DEFAULTS[key] end,
     changed = function(key)
+      if key == "mapArrow" and ns.ArrowStop then ns.ArrowStop() end -- the next right-click uses the new arrow
       if key == "minimapButton" then if ns.RefreshMinimapButton then ns.RefreshMinimapButton() end
       elseif key and key:find("^map") or key == "pinStyle" then Pins() end
       if ns.Refresh then ns.Refresh() end
