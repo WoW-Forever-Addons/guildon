@@ -1,5 +1,9 @@
 # Changes
 
+## 0.11.3
+- **World map with OpenMap:** guild members show on OpenMap's stitched map (needs DonMap 1.3.3).
+- **Level number:** the level below a member no longer grows when you zoom in.
+
 ## 0.11.2
 - **World map:** a guild member standing under one of Questdon's quest marks can be hovered and clicked again (needs DonMap 1.3.1).
 

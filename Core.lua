@@ -56,6 +56,7 @@ function ns.DiagExtra()
       :format(tostring(ws.map), tostring(ws.mine), ws.w or 0, ws.h or 0, ws.scale or 0, ws.have, ws.onMap, ws.pins, tostring(ws.vis),
         tostring(ws.alpha), tostring(ws.size), tostring(ws.level), tostring(ws.canvasLevel)))
     print(("  map levels: explored areas %s, area POI %s"):format(tostring(ws.expl), tostring(ws.poi)))
+    if ws.openMap then print(("  OpenMap stitches the world map: pins above its art (top level %s)"):format(tostring(ws.openMapTop))) end
   else
     print("  world map: not looked at yet (open the world map once, then /gn diag)")
   end

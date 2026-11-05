@@ -594,8 +594,13 @@ local function NewPin(parent, size)
   b.mark:SetTexture(look.sketchMarks)
   b.mark:SetVertexColor(1, 1, 1)
   b.mark:Hide()
-  b.level = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-  b.level:SetPoint("TOP", b, "BOTTOM", 0, 2)
+  -- (05.11.2026, Daniel: "die Levelzahlen machen ganz wirre sachen") the level on a holder scaled by 1 / the canvas's scale
+  -- (DonMap hands it to paint), so it keeps its size on the screen at every zoom like the pin itself
+  b.textHolder = CreateFrame("Frame", nil, b)
+  b.textHolder:SetSize(1, 1)
+  b.textHolder:SetPoint("TOP", b, "BOTTOM", 0, 2)
+  b.level = b.textHolder:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  b.level:SetPoint("TOP", b.textHolder, "TOP", 0, 0)
   -- (Daniel 26.10.: "die Levelzahl vielleicht noch schwarz umranden?") a black outline, readable on every map
   -- (Daniel 27.10.: "wieso ist die Levelzahl so krumm und schief") a whole font size, the outline plus a shadow, and
   -- the pins themselves on whole pixels (UpdateWorldPins, UpdateMiniPins): half pixels made the outline uneven
@@ -669,6 +674,9 @@ end
 
 local function Paint(b, members, size, groupSize, opts)
   local look = ns.PIN_LOOK
+  local sc = tonumber(opts and opts.scale) or 1
+  if sc <= 0 then sc = 1 end
+  if b.textHolder and b.textHolder.SetScale and b.textScale ~= sc then b.textScale = sc pcall(b.textHolder.SetScale, b.textHolder, 1 / sc) end
   b:SetAlpha(ns.PinAlpha())
   local frame, disk, style = ns.PinTextures(opts and opts.style)
   if b.style ~= style then
@@ -776,7 +784,7 @@ local function Source()
       return ns.PIN_LOOK.near.mini * Mult(db.mapMiniScale)
     end,
     newPin = function(parent, size) return NewPin(parent, size) end,
-    paint = function(b, members, size, groupSize) Paint(b, members, size, groupSize) end,
+    paint = function(b, members, size, groupSize, where, scale) Paint(b, members, size, groupSize, { scale = scale }) end,
   })
   return src
 end
@@ -820,6 +828,7 @@ local function NoteWorld(s, n)
   ws.pins, ws.vis, ws.alpha = n or s.n.world, first and Ask(first, "IsVisible"), first and Ask(first, "GetEffectiveAlpha")
   ws.size, ws.level, ws.canvasLevel = first and Ask(first, "GetWidth"), first and Ask(first, "GetFrameLevel"), info.canvasLevel
   ws.expl, ws.poi = ns.MapLevels()
+  ws.openMap, ws.openMapTop = info.openMap, info.openMapTop
 end
 
 -- (31.10.2026, A1) what the pins were last built from: the positions' version and the look; the stamp is the points'
