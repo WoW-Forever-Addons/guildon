@@ -1,5 +1,8 @@
 # Changes
 
+## 0.11.4
+- **Hidden surnames on WoW Forever:** with surnames turned off in the game's options, members are no longer whispered as "Name Surname-Surname", and the chat no longer says at login that such a player is not online.
+
 ## 0.11.3
 - **World map with OpenMap:** guild members show on OpenMap's stitched map (needs DonMap 1.3.3).
 - **Level number:** the level below a member no longer grows when you zoom in.
