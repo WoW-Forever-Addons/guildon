@@ -1,5 +1,11 @@
 # Changes
 
+## 0.12.0
+- **Your own arrow stays on top:** on the minimap your arrow is drawn above a guild member's pin that lies on it, so the pins can stay fully visible (option "My arrow above the pins", on by default; needs DonMap 1.3.4).
+- **Group members without a guild pin:** members of your party or raid no longer get a second dot next to the game's own; option "Group members as pins" brings them back.
+- **Pins only clickable with Alt** (option, off by default): clicks and the mouse go through the guild pins to the map and quest pins below; hold Alt for the tooltip, whisper and arrow.
+- **/gn mem:** measures the memory of Guildon, Crafts & Recipes and DonMap in the game.
+
 ## 0.11.4
 - **Hidden surnames on WoW Forever:** with surnames turned off in the game's options, members are no longer whispered as "Name Surname-Surname", and the chat no longer says at login that such a player is not online.
 

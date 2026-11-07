@@ -20,6 +20,7 @@ local ARROW_TEXT = { auto = "Automatic", donmap = "DonMap arrow", tomtom = "TomT
 ns.OPTION_DEFAULTS = {
   mapShare = "guild", mapHidePvP = false, mapWorld = true, mapMinimap = true, mapInstance = false, mapLayer = false,
   pinStyle = "emblem", mapWorldScale = 0.6, mapMiniScale = 0.65, mapPinAlpha = 1, minimapButton = true, mapArrow = "auto",
+  mapOwnArrow = true, mapAltClick = false, mapShowGroup = false, -- (07.11.2026, a player on Discord) DonMap draws the own arrow above the pins (DonMapAPI 6)
 }
 
 local function Percent(v) return ("%d %%"):format(math.floor((tonumber(v) or 0) * 100 + 0.5)) end
@@ -27,6 +28,7 @@ local function Percent(v) return ("%d %%"):format(math.floor((tonumber(v) or 0) 
 local function Pins()
   if ns.UpdateWorldPins then ns.SafeCall("pins", ns.UpdateWorldPins) end
   if ns.UpdateMiniPins then ns.SafeCall("pins", ns.UpdateMiniPins) end
+  if ns.ApplyPinMouse then ns.SafeCall("pins", ns.ApplyPinMouse) end
 end
 
 local ITEMS = {
@@ -40,6 +42,10 @@ local ITEMS = {
   { header = "Pins" },
   { key = "mapWorld", name = "Members on the world map", tip = "Guild members with Guildon as pins on the world map." },
   { key = "mapMinimap", name = "Members on the minimap", tip = "Guild members with Guildon as pins on the minimap." },
+  { key = "mapShowGroup", name = "Group members as pins",
+    tip = "Off by default: members of your party or raid get no guild pin, the game already shows them. On: they get one as well." },
+  { key = "mapOwnArrow", name = "My arrow above the pins",
+    tip = "Your own arrow on the minimap stays visible when a member's pin lies on it, so the pins can stay fully visible." },
   { key = "pinStyle", name = "Pin look", kind = "dropdown", tip = "The look of the pins, always in the class colour.",
     options = function()
       local out = {}
@@ -52,6 +58,8 @@ local ITEMS = {
     tip = "Size of the guild pins on the minimap. 100 % is the normal size." },
   { key = "mapPinAlpha", name = "Opacity", kind = "slider", min = 0.2, max = 1, step = 0.05, format = Percent,
     tip = "How see-through the guild pins on the world map and the minimap are. 100 % is fully visible." },
+  { key = "mapAltClick", name = "Pins only clickable with Alt",
+    tip = "On: clicks and the mouse go through the guild pins to the map and the quest pins below. Hold Alt to see a member's tooltip, whisper him or set the arrow. Off by default." },
   { key = "mapLayer", name = "Show the layer",
     tip = "The layer (server copy of the zone) of each member in the tooltips and lists, compared with yours. Off by default." },
   { key = "mapArrow", name = "Arrow to a member", kind = "dropdown",
@@ -112,8 +120,8 @@ local function Register()
     tabs = {
       { key = "map", title = "Map", icon = "Interface\\Icons\\INV_Misc_Map_01", preview = Preview,
         text = "Who sees you on the map, and how the guild members look on the world map and the minimap.",
-        main = { "header:Sharing", "mapShare", "mapHidePvP", "mapInstance", "header:Pins", "mapWorld", "mapMinimap", "pinStyle",
-          "mapWorldScale", "mapMiniScale", "mapPinAlpha" }, more = { "mapArrow", "mapLayer" } },
+        main = { "header:Sharing", "mapShare", "mapHidePvP", "mapInstance", "header:Pins", "mapWorld", "mapMinimap", "mapShowGroup", "mapOwnArrow", "pinStyle",
+          "mapWorldScale", "mapMiniScale", "mapPinAlpha", "mapAltClick" }, more = { "mapArrow", "mapLayer" } },
       { key = "window", title = "Window", icon = "Interface\\Icons\\INV_Misc_GroupNeedMore",
         text = "The minimap button of all Guildon parts and the place of the window.",
         main = { "minimapButton", "button:resetWindow" } },

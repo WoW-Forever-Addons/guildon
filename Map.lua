@@ -672,12 +672,37 @@ function ns.PinAlpha()
   return math.max(0.2, math.min(1, v))
 end
 
+-- (07.11.2026, a player on Discord: clicks on the big map hit guild pins instead of Questie's pins or the map; Daniel:
+-- "Nur mit Alt", both maps) option mapAltClick: the pins take the mouse only while Alt is held, else clicks and hovering
+-- go through to what lies below. Preview pins never take it.
+function ns.PinMouse()
+  if not (ns.db and ns.db.mapAltClick) then return true end
+  return (IsAltKeyDown and IsAltKeyDown()) and true or false
+end
+local function PinMouse(b, on)
+  if b._gnPreview or not b.EnableMouse or b._gnMouse == on then return end
+  b._gnMouse = on
+  b:EnableMouse(on)
+  if not on and ns.Kit and ns.Kit.HideTooltip then
+    local okO, owned = pcall(GameTooltip.IsOwned, GameTooltip, b)
+    if okO and owned then ns.Kit.HideTooltip(b) end
+  end
+end
+function ns.ApplyPinMouse()
+  local on = ns.PinMouse()
+  local w, m = ns.MapPins()
+  for _, b in ipairs(w) do PinMouse(b, on) end
+  for _, b in ipairs(m) do PinMouse(b, on) end
+end
+ns.On("MODIFIER_STATE_CHANGED", function() if ns.db and ns.db.mapAltClick then ns.ApplyPinMouse() end end)
+
 local function Paint(b, members, size, groupSize, opts)
   local look = ns.PIN_LOOK
   local sc = tonumber(opts and opts.scale) or 1
   if sc <= 0 then sc = 1 end
   if b.textHolder and b.textHolder.SetScale and b.textScale ~= sc then b.textScale = sc pcall(b.textHolder.SetScale, b.textHolder, 1 / sc) end
   b:SetAlpha(ns.PinAlpha())
+  PinMouse(b, ns.PinMouse())
   local frame, disk, style = ns.PinTextures(opts and opts.style)
   if b.style ~= style then
     b.dot:SetTexture(disk)
@@ -743,6 +768,7 @@ end
 -- opts.style picks the look (nil = the chosen one)
 function ns.PreviewPin(parent, size)
   local b = NewPin(parent, size)
+  b._gnPreview = true
   b:SetScript("OnEnter", nil)
   b:SetScript("OnLeave", nil)
   b:SetScript("OnClick", nil)
@@ -771,6 +797,9 @@ local function Source()
     world = function() return DB().mapWorld end,
     -- (Daniel 26.10.) dungeons and raids: minimap off by default, on with the switch
     minimap = function() local db = DB() return db.mapMinimap and not (InInstance() and not db.mapInstance) end,
+    -- (07.11.2026, a player on Discord: "meinen eigenen Pfeil auf der Minimap auch weiterhin als Pfeil") DonMap draws a
+    -- copy of the player's arrow above a pin that lies on it (DonMapAPI 6); see-through pins were the only way before
+    playerOnTop = function() return DB().mapOwnArrow ~= false end,
     -- (Daniel 26.10.) everyone sets the pin size himself, the groups grow with it
     size = function(where)
       local look, db = ns.PIN_LOOK, DB()
@@ -791,10 +820,30 @@ end
 
 -- the members on the map as DonMap points (the member's own data stays on the point: name, p); not myself (05.11.2026,
 -- Daniel: "man sieht sich selber auf der karte"; the game draws the player's own arrow, before: only off the minimap)
+-- (07.11.2026, Frankston on Discord: "Wenn man mit Gildies in der party ist, sollte der punkt nicht gezeigt werden",
+-- the game's party dot and the Guildon pin lay on each other; Daniel: hidden by default, an option shows them again)
+-- the members of the own party or raid by full name, built anew on GROUP_ROSTER_UPDATE
+local groupNames, groupStamp = {}, 0
+local function ReadGroup()
+  for k in pairs(groupNames) do groupNames[k] = nil end
+  local raid = ns.Call(IsInRaid) and true or false
+  local n = ns.Num(ns.Call(GetNumGroupMembers)) or 0
+  if raid then
+    for i = 1, math.min(n, 40) do local full = ns.UnitFull("raid" .. i) if full then groupNames[full] = true end end
+  elseif n > 0 then
+    for i = 1, 4 do local full = ns.UnitFull("party" .. i) if full then groupNames[full] = true end end
+  end
+  groupStamp = groupStamp + 1
+end
+ns.On("GROUP_ROSTER_UPDATE", function() ReadGroup() end)
+ns.On("PLAYER_ENTERING_WORLD", function() ReadGroup() end)
+function ns.InMyGroup(name) return name ~= nil and groupNames[name] == true end
+local function HideGroup() local db = ns.db return not (db and db.mapShowGroup) end
+
 local function Points()
-  local list, me = {}, ns.MyName()
+  local list, me, hideGroup = {}, ns.MyName(), HideGroup()
   for name, p in pairs(ns.Positions()) do
-    if name ~= me then
+    if name ~= me and not (hideGroup and groupNames[name]) then
       list[#list + 1] = { mapID = p.map, x = p.x, y = p.y, key = name, name = name, p = p,
         sig = (p.level or 0) .. (p.class or "") .. (p.layer or "") }
     end
@@ -842,8 +891,10 @@ end
 -- hand the points over when they or the look changed (the example guild's travellers always); true then
 local function Hand(s)
   local style, alpha, demo = ns.PinStyle(), ns.PinAlpha(), ns.demo and true or false
-  if built.version == version and built.style == style and built.alpha == alpha and built.demo == demo and not demo then return false end
-  built.version, built.style, built.alpha, built.demo, built.stamp = version, style, alpha, demo, built.stamp + 1
+  local group = HideGroup() and groupStamp or -1 -- (07.11.2026) the group changed or the option
+  if built.version == version and built.style == style and built.alpha == alpha and built.demo == demo and built.group == group
+      and not demo then return false end
+  built.version, built.style, built.alpha, built.demo, built.group, built.stamp = version, style, alpha, demo, group, built.stamp + 1
   CrestNow()
   if (DonMapAPI.version or 0) >= 3 then s:SetPoints(Points(), built.stamp) else s:SetPoints(Points()) end
   return true

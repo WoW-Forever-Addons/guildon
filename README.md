@@ -31,6 +31,7 @@ Update mit neuen Bildern das Spiel ganz neu starten, `/reload` reicht dann nicht
 - `/gn sync` die Gilde jetzt nach neuen Daten fragen
 - `/gn demo` Beispielgilde (nochmal: aus)
 - `/gn diag` Stand des Austauschs und Fehler
+- `/gn mem` Speicher von Guildon und DonMap, 30 Sekunden gemessen (`/gn mem 60`: länger)
 - `/gn help` alle Befehle
 - `/gn wishes`, `/gn export` und `/gn recipes` sind jetzt in Crafts & Recipes (`/gnc`).
 

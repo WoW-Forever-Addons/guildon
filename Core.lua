@@ -83,6 +83,7 @@ ns.COMMANDS = {
   { "/gn sync", "ask the guild for new data now" },
   { "/gn diag", "state of the exchange and errors" },
   { "/gn layer", "what the layer reading sees (target a creature first)" },
+  { "/gn mem", "memory of Guildon and DonMap, measured for 30 seconds (/gn mem 60: longer)" },
   { "/gn demo", "example guild to try the windows (again: off)" },
   { "/gn help", "this list" },
 }
@@ -107,6 +108,8 @@ function ns.Slash(msg)
     if ns.SetDemo then ns.SetDemo(msg == "demo off" and false or (msg == "demo on" and true or not ns.demo)) end
   elseif msg == "diag" then
     if ns.PrintDiag then ns.PrintDiag() end
+  elseif msg:match("^mem") or msg:match("^speicher") then
+    ns.MemoryCheck(tonumber(msg:match("(%d+)")))
   elseif msg == "layer" then
     if ns.LayerDiag then ns.LayerDiag() end
   elseif msg == "names" or msg == "namen" then
@@ -143,6 +146,64 @@ function ns.NamesDiag()
   if UnitExists and ns.Call(UnitExists, "target") then out[#out + 1] = "target " .. S(ns.Call(UnitName, "target")) .. " full " .. S(ns.Call(UnitFullName, "target")) end
   for _, line in ipairs(out) do ns.Print(line) end
   if ns.db then ns.db.namesDiag = out end
+end
+
+-- (07.11.2026, Daniel: "Und ingame?" after the memory test in gn_harness) /gn mem [seconds]: memory of the Guildon
+-- parts and DonMap now, and how much new memory they take a second; the collector pauses meanwhile (at most 2 minutes,
+-- as Questdon's /qd mem), no measuring in a fight. Kept in GuildonDB.memDiag (read after a /reload).
+local MEM_ADDONS = { "Guildon", "Guildon_Crafts", "DonMap" }
+local memRun
+function ns.MemoryCheck(seconds)
+  seconds = math.max(5, math.min(120, tonumber(seconds) or 30))
+  if memRun then ns.Print(L["Already measuring."]) return end
+  if type(UpdateAddOnMemoryUsage) ~= "function" or type(GetAddOnMemoryUsage) ~= "function" then
+    ns.Print(L["The game does not tell the memory of addons here."]) return
+  end
+  local list = {}
+  for _, name in ipairs(MEM_ADDONS) do
+    local ok, kb = pcall(GetAddOnMemoryUsage, name)
+    if ok and ns.Num(kb) then list[#list + 1] = { name = name, grown = 0 } end
+  end
+  memRun = { left = seconds }
+  ns.Print(L["Measuring the memory for %d seconds (stay out of fights)..."]:format(seconds))
+  local function Sample()
+    if InCombatLockdown and InCombatLockdown() then return end
+    pcall(UpdateAddOnMemoryUsage)
+    for _, e in ipairs(list) do
+      local ok, kb = pcall(GetAddOnMemoryUsage, e.name)
+      kb = ok and ns.Num(kb) or nil
+      if kb then
+        if e.last and kb > e.last then e.grown = e.grown + (kb - e.last) end
+        e.last = kb
+      end
+    end
+  end
+  memRun.gcStopped = pcall(collectgarbage, "stop")
+  Sample()
+  local ticker
+  ticker = ns.NewTicker(1, function()
+    Sample()
+    memRun.left = memRun.left - 1
+    if memRun.left > 0 then return end
+    if ticker then ticker:Cancel() end
+    if memRun.gcStopped then pcall(collectgarbage, "restart") end
+    memRun = nil
+    local out = {}
+    for _, e in ipairs(list) do
+      if e.last then
+        out[#out + 1] = L["%s: %.1f MB, about %d KB new memory a second"]:format(e.name, e.last / 1024, math.floor(e.grown / seconds + 0.5))
+      end
+    end
+    local npos = 0
+    for _ in pairs(ns.Positions and ns.Positions() or {}) do npos = npos + 1 end
+    local w, m, nw, nm = {}, {}, 0, 0
+    if ns.MapPins then w, m = ns.MapPins() end
+    for _, b in ipairs(w) do if b:IsShown() then nw = nw + 1 end end
+    for _, b in ipairs(m) do if b:IsShown() then nm = nm + 1 end end
+    out[#out + 1] = L["%d members with a position; pins: %d on the world map, %d on the minimap"]:format(npos, nw, nm)
+    for _, line in ipairs(out) do ns.Print(line) end
+    if ns.db then ns.db.memDiag = { t = time and time() or 0, seconds = seconds, lines = out } end
+  end)
 end
 
 SlashCmdList["GUILDON"] = function(msg) ns.SafeCall("slash", ns.Slash, msg) end
