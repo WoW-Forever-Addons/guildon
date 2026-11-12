@@ -1,5 +1,8 @@
 # Changes
 
+## 0.12.1
+- **No more rows of "No player named ... is currently playing":** when a guild member logged out while the addon was still sending them data, the chat showed one yellow line per message, most often with the map open. Nothing is sent any more to a member who went offline.
+
 ## 0.12.0
 - **Your own arrow stays on top:** on the minimap your arrow is drawn above a guild member's pin that lies on it, so the pins can stay fully visible (option "My arrow above the pins", on by default; needs DonMap 1.3.4).
 - **Group members without a guild pin:** members of your party or raid no longer get a second dot next to the game's own; option "Group members as pins" brings them back.
