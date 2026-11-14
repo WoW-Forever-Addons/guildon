@@ -1,5 +1,9 @@
 # Changes
 
+## 0.12.2
+
+- **Cleaner text in narrow places:** text that is shrunk to fit keeps one font and size, also after the game window changes its size.
+
 ## 0.12.1
 - **No more rows of "No player named ... is currently playing":** when a guild member logged out while the addon was still sending them data, the chat showed one yellow line per message, most often with the map open. Nothing is sent any more to a member who went offline.
 
