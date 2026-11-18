@@ -61,13 +61,17 @@ function ns.MapEntries(search, filter)
         local p, name = m.p, m.name
         local cls = ns.ClassHex(p.class)
         out[#out + 1] = { kind = "table", key = name, name = name, p = p, zone = z.name, class = p.class, status = "green",
-          cells = { "|c" .. cls .. m.short .. "|r", { text = m.class, color = UI.C.muted }, { text = tostring(p.level or 0), color = UI.C.title },
-            { text = layer and ns.LayerLine(p) or "", color = UI.C.muted }, { text = Ago(p), color = UI.C.quiet } },
+        -- (18.11.2026) without the layer the row has no layer cell (the head then has no layer column, no gap)
+          cells = layer and { "|c" .. cls .. m.short .. "|r", { text = m.class, color = UI.C.muted }, { text = tostring(p.level or 0), color = UI.C.title },
+            { text = ns.LayerLine(p) or "", color = UI.C.muted }, { text = Ago(p), color = UI.C.quiet } }
+          or { "|c" .. cls .. m.short .. "|r", { text = m.class, color = UI.C.muted }, { text = tostring(p.level or 0), color = UI.C.title },
+            { text = Ago(p), color = UI.C.quiet } },
           tooltipFn = function()
             return "|c" .. cls .. m.short .. "|r", { z.name, layer and ns.LayerLine(p) or nil,
               ns.CanArrow and ns.CanArrow() and L["Right-click: arrow to this member"] or nil },
               L["Click: show on the world map"]
           end }
+        ns.ClassIconFor(out[#out], UI ~= Kit)
       end
     end
   end
@@ -118,12 +122,19 @@ ns.PAGE_BUILDERS.map = function(p)
   p.share.dot:SetSize(6, 6)
   p.share.dot:SetPoint("LEFT", p.share, "LEFT", 8, 0)
   p.share:SetTooltip(L["Share my position"], { L["Who sees you on the map. Click: change it in the options."] })
-  p.head = UI.TableHead(p, { icon = true, columns = {
-    { key = "name", text = L["Name"], width = 110, grow = true },
-    { key = "class", text = L["Class"], width = 96 },
-    { key = "level", text = L["Lvl"], width = 30, justify = "RIGHT" },
-    { key = "layer", text = L["Layer"], width = 48 },
-    { key = "age", text = L["Reported"], width = 70, justify = "RIGHT" } } })
+  -- (18.11.2026, the game's look showed a gap without head where the hidden layer column was) two heads: with and
+  -- without the layer column; the one that fits the option is shown and bound to the list (p.head)
+  local blizz = UI ~= Kit
+  local function Head(layer)
+    local cols = { { key = "name", text = L["Name"], width = blizz and 130 or 110, grow = true },
+      { key = "class", text = L["Class"], width = blizz and 84 or 96, min = 56, shrink = 2 },
+      { key = "level", text = L["Lvl"], width = 30, justify = "RIGHT" } }
+    if layer then cols[#cols + 1] = { key = "layer", text = L["Layer"], width = 48 } end
+    cols[#cols + 1] = { key = "age", text = L["Reported"], width = blizz and 80 or 70, min = 64, shrink = 1, justify = "RIGHT" }
+    return UI.TableHead(p, { icon = true, columns = cols })
+  end
+  p.headLayer, p.headPlain = Head(true), Head(false)
+  p.head = p.headPlain
   p.list = UI.List(p, {
     onToggle = function(e)
       ns.db.mapZone = type(ns.db.mapZone) == "table" and ns.db.mapZone or {}
@@ -143,6 +154,13 @@ ns.PAGE_BUILDERS.map = function(p)
   })
   p.list:SetEmpty(L["No member with Guildon is sharing a position right now."])
   p.detail = UI.Detail(p, { onClose = function() p.picked, p.lastClick = nil, nil p.list:Select(nil) ns.Relayout() end })
+  -- the share button's text: "You share: With the guild", or short only the setting (the dot and the tooltip say the rest)
+  p.ShareText = function(self, short)
+    local share = ns.db.mapShare or "guild"
+    local what = L[SHARE_TEXT[share] or SHARE_TEXT.guild]
+    self._shareShort = short and true or nil
+    self.share:SetText("   " .. (short and what or L["You share: %s"]:format(what)))
+  end
   p.Search = function(self) return tostring(self.search:GetText() or ""):lower():gsub("^%s+", ""):gsub("%s+$", "") end
   p.Hint = function() return L["Only members with Guildon can be shown; in dungeons and raids only with the option."] end
   p.Picked = function(self)
@@ -157,23 +175,39 @@ ns.PAGE_BUILDERS.map = function(p)
     self.search:ClearAllPoints()
     self.search:SetPoint("TOPLEFT", self, "TOPLEFT", S.pad, -y)
     local sw = math.min(200, math.floor(lw * 0.3))
-    self.search:Layout(sw)
-    -- right: the share button (its text cut to what is left), the count left of it
-    local shareMax = math.min(230, math.floor(lw * 0.36))
-    self.share:Layout(math.min(self.share.natural or shareMax, shareMax))
+    -- (18.11.2026, the game's look cut the chip "My zone" and laid the count on it) right the share button, as wide as
+    -- its text (the short text when the long one has no room), the chips keep their whole width, the search gives way
+    -- down to 110 px, and the count only shows where it has room of its own
+    local chipsW = self.chips:ContentWidth()
+    local shareMax = math.max(80, lw - S.gap - 110 - S.gap - chipsW - S.gap)
+    shareMax = math.min(shareMax, math.max(230, math.floor(lw * 0.36)))
+    self:ShareText(false)
+    if (self.share.natural or 0) > shareMax then self:ShareText(true) end
+    -- never narrower than its text (the game's button does not cut it)
+    self.share:Layout(self.share.natural or shareMax)
     self.share:ClearAllPoints()
     self.share:SetPoint("TOPRIGHT", self, "TOPLEFT", S.pad + lw, -y - 2)
+    local shareW = self.share:GetWidth() or 0
+    UI.Fit(self.count, 120)
+    local countW = math.min(UI.TextWidth(self.count), 120)
+    sw = math.max(110, math.min(sw, lw - 3 * S.gap - chipsW - shareW - countW))
+    self.search:Layout(sw)
+    local free = lw - sw - S.gap - chipsW - S.gap - shareW - S.gap
+    self.count:SetShown(free >= countW)
     self.count:ClearAllPoints()
     self.count:SetPoint("TOPRIGHT", self.share, "TOPLEFT", -S.gap, -5)
-    UI.Fit(self.count, 120)
-    local cx = S.pad + lw - self.share:GetWidth() - S.gap - math.min(UI.TextWidth(self.count), 120) - S.gap
+    local cx = S.pad + lw - shareW - S.gap - (self.count:IsShown() and countW + S.gap or 0)
     self.chips:ClearAllPoints()
     self.chips:SetPoint("TOPLEFT", self, "TOPLEFT", S.pad + sw + S.gap, -y - 2)
     self.chips:Layout(math.max(40, cx - (S.pad + sw + S.gap)))
     y = y + S.button + S.gap
+    local layer = ns.ShowLayer() and true or false
+    self.head = layer and self.headLayer or self.headPlain
+    self.headLayer:SetShown(layer) self.headPlain:SetShown(not layer)
     self.head:ClearAllPoints()
     self.head:SetPoint("TOPLEFT", self, "TOPLEFT", S.pad, -y)
     self.head:Bind(self.list)
+    ns.FitColumns(self.head.columns, ns.RowWidth(lw), true)
     self.head:Layout(lw)
     y = y + S.chip
     self.list:ClearAllPoints()
@@ -205,11 +239,12 @@ ns.PAGE_BUILDERS.map = function(p)
   p.Refresh = function(self)
     local share = ns.db.mapShare or "guild"
     local st = UI.STATUS[SHARE_COLOR[share] or "grey"]
-    self.share:SetText("   " .. L["You share: %s"]:format(L[SHARE_TEXT[share] or SHARE_TEXT.guild]))
+    self:ShareText(self._shareShort)
     self.share.dot:SetVertexColor(st.fg[1], st.fg[2], st.fg[3], 1)
     self.chips:SetActive(ns.db.mapFilter == "here" and "here" or "all")
     local data = ns.MapEntries(self:Search(), ns.db.mapFilter)
-    self.head.cells[4]:SetShown(ns.ShowLayer())
+    -- the head that fits the layer option, before the rows are drawn under it
+    if (self.head == self.headLayer) ~= (ns.ShowLayer() and true or false) and self._w then self:Layout(self._w, self._h, self._mode) end
     self.list:SetItems(data)
     local picked = self:Picked()
     self.list.selected = picked

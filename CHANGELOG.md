@@ -1,5 +1,12 @@
 # Changes
 
+## 0.13.1
+
+- **Overview in the game's look:** opening the Overview tab no longer switches the window back to the Don look.
+- **Members:** all columns fit in the list, names up to about 18 letters show in full, the zone stands inside the list and no longer runs into the census; class symbols in the rows; the census shows only whole lines.
+- **Map:** the buttons "My zone" and "You share" are as wide as their text, the member count never sits on a button, the column heads have no gap.
+- **/gn diag:** names the last time the window fell back to the Don look, also after a /reload.
+
 ## 0.13.0
 - **The game's look, out of the box:** the Guildon window and all its pages (members, overview, census) use the game's own frame, tabs, buttons and lists, with the guild crest in the round portrait. Prefer the old look? Turn off "Windows in the game's look" in the options (tab Window); the change applies at once.
 - **Options in the game's settings:** all options are now pages under Options > AddOns > Guildon: Map & Members. The gear, `/gn options` and the minimap menu open them there. What the game's settings cannot do, like the preview of the pins, opens in the Don options window from a button. Needs a game restart once; without the game's templates (Classic Era) or with the option off, everything stays in the Don window as before.

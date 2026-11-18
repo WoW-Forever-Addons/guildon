@@ -33,6 +33,19 @@ function ns.LookKit()
   if kit then return kit, true end
   return Kit, false, "missing: " .. tostring(miss)
 end
+-- (18.11.2026, Daniel's screenshots: the window fell back to the Don look, the reason was gone after a /reload) a
+-- fallback of the window (GuildShared/Window.lua SayLook) keeps its error in the saved table for /gn diag and says it
+-- once per session in the chat, as before
+local lookSaid
+function ns.LookFailed(what, err)
+  if ns.db then
+    ns.db.lookFailed = { what = tostring(what), err = tostring(err):sub(1, 400), t = time(),
+      v = C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata(addonName, "Version") or "?" }
+  end
+  if lookSaid then return end
+  lookSaid = true
+  ns.Print(L["The window could not be built in the game's look, it opens in the Don look. %s says why."]:format("/gn diag"))
+end
 ns.WORDMARK = "|cff3fa9f5Guil|rdon"
 -- own prefix per game version, so Forever and Era data never mix (like Questdon's QdShareEra)
 ns.PREFIX = ns.ERA and "GuildonEra" or "Guildon"
@@ -69,6 +82,11 @@ function ns.DiagExtra(out)
   local ws = ns.WorldPinState and ns.WorldPinState()
   if not DonMapAPI then out("  DonMap is missing: no guild members on the maps") end -- (30.10.2026) DonMap draws the pins
   if ns.WindowLook then out("  window look: " .. tostring(ns.WindowLook())) end -- (16.11.2026) "blizzard" or "kit (why)"
+  -- (18.11.2026) the last fallback to the Don look, kept over a /reload (ns.LookFailed below)
+  local lf = ns.db and ns.db.lookFailed
+  if type(lf) == "table" and lf.err then
+    out(("  last fallback to the Don look (%s, Guildon %s): %s"):format(type(date) == "function" and date("%d.%m. %H:%M", tonumber(lf.t) or 0) or tostring(lf.t), tostring(lf.v), tostring(lf.err)))
+  end
   if ns.OptionsLook then out("  options: " .. ns.OptionsLook()) end -- (16.11.2026) "game settings" or "don window"
   if ws then
     out(("  world map: shown map %s, you on %s, canvas %dx%d, scale %.2f, positions %d, on this map %d, pins %d; first pin visible %s, alpha %s, size %s, level %s (canvas %s)")

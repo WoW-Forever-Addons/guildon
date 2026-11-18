@@ -27,6 +27,39 @@ function ns.TitleText() return "Guildon" end
 
 local function N(v) return ns.Style.Number and ns.Style.Number(v) or tostring(v or 0) end
 
+-- (18.11.2026, Daniel: "guck dir jedes fenster haargenau an und mach es besser"; the game's look cut names and pushed the zone out of the list) the columns share the list's width: each
+-- starts at its own width (col.base), and when the row is too narrow the columns with col.min give way in col.shrink order
+-- (1 first) before the grow column (the name) falls under its width. w is the width the rows lay out in.
+function ns.FitColumns(cols, w, icon)
+  for _, c in ipairs(cols) do c.base = c.base or c.width c.width = c.base end
+  local out = Kit.TableCols(cols, w, icon)
+  local last = out[#out]
+  local over = last and (last.x + last.w) - (w - S.pad) or 0
+  if over <= 0 then return cols end
+  local order = {}
+  for _, c in ipairs(cols) do if c.min and not c.grow then order[#order + 1] = c end end
+  table.sort(order, function(a, b) return (a.shrink or 9) < (b.shrink or 9) end)
+  for _, c in ipairs(order) do
+    if over <= 0 then break end
+    local give = math.min(over, c.width - c.min)
+    if give > 0 then c.width, over = c.width - give, over - give end
+  end
+  if over > 0 then for _, c in ipairs(cols) do if c.grow then c.width = math.max(40, c.width - over) end end end
+  return cols
+end
+
+-- (18.11.2026, the game's look showed an empty gap left of the names) the class symbol in a table row of the game's
+-- look: its rows take item.icon (and iconCoords), the Kit's rows item.class
+function ns.ClassIconFor(e, blizz)
+  if not (blizz and e and e.class) then return e end
+  local tc = Kit.ClassCoords and Kit.ClassCoords(e.class)
+  if tc and Kit.CLASS_SHEET then e.icon, e.iconCoords = Kit.CLASS_SHEET, tc end
+  return e
+end
+
+-- the width the list's table rows lay out in: the game's list keeps 20 px for its scroll bar
+function ns.RowWidth(lw) return lw - 20 end
+
 ---------------------------------------------------------------------------
 -- Overview: the guild as a hero, the numbers as tiles that share the width (more width = more tiles per row)
 ---------------------------------------------------------------------------
@@ -138,7 +171,9 @@ local function BuildOverview(p)
     t.crafts:SetData(L["Professions and wishes"], cd and L["Crafts & Recipes"] or L["not loaded"],
       cd and L["Click: open Guildon Crafts"] or L["Guildon Crafts is not loaded: professions, recipes and wishes are in it."],
       cd and UI.C.txGold or UI.C.muted)
-    t.crafts:SetDisabled(not cd)
+    -- (18.11.2026, Daniel's /gn diag: "Pages.lua:141: attempt to call a nil value" put the window into the Don look) the
+    -- tile of the game's look may come without SetDisabled (an older DonCore Blizz loaded first)
+    if t.crafts.SetDisabled then t.crafts:SetDisabled(not cd) end
     if ns.demo then
       self.note:SetText(L["Example guild is on: the members ending in -Demo are made up and only on your screen. /gn demo off removes them."])
     else
@@ -154,6 +189,8 @@ end
 ---------------------------------------------------------------------------
 local MEM_FILTER_TEXT = { all = "All", online = "Online", guildon = "With Guildon" }
 local CENSUS_W = 280
+-- (18.11.2026) in the game's look the census is narrower: its larger fonts need the room in the list
+local function CensusW() return UI ~= Kit and 256 or CENSUS_W end
 local LEVEL_BANDS = { { 1, 9 }, { 10, 19 }, { 20, 29 }, { 30, 39 }, { 40, 49 }, { 50, 59 }, { 60, 60 } }
 
 local function Peer(m) return ns.db.peers[m.name] or (m.demo and { v = ns.VERSION }) end
@@ -214,6 +251,7 @@ function ns.MemberEntries(search, filter, showOffline, class, sortKey, desc)
         if m.demo then lines[#lines + 1] = L["Example member, only on your screen (/gn demo off)."] end
         return "|c" .. cls .. m.short .. "|r", lines, m.name ~= ns.MyName() and (L["Click: whisper"] .. "\n" .. L["Right-click: invite to your group"]) or nil
       end }
+    ns.ClassIconFor(e, UI ~= Kit)
     if m.online then online[#online + 1] = e else offline[#offline + 1] = e end
   end
   local out = {}
@@ -323,9 +361,8 @@ local function FillCensus(p, d)
   for z, n in pairs(zones) do zl[#zl + 1] = { key = z, text = z, value = n } end
   table.sort(zl, function(a, b) if a.value ~= b.value then return a.value > b.value end return a.text < b.text end)
   for i = #zl, 7, -1 do zl[i] = nil end
-  d.zones:SetEntries(zl)
   -- the body: numbers, classes, levels, zones
-  local w = math.max(40, (d._w or CENSUS_W) - 2 * S.pad - 6)
+  local w = math.max(40, (d._w or CensusW()) - 2 * S.pad - 6)
   d:Begin()
   d:Block(d.nums, 40)
   d:Section(L["By class"], L["all · online"])
@@ -333,6 +370,13 @@ local function FillCensus(p, d)
   d:Section(L["By level"])
   d:Block(d.levels, 48)
   d:Block(d.levelNames, 14)
+  -- (18.11.2026, the game's look cut the second zone in half) only whole zone rows: as many as the card has room for
+  local areaH = d.area and tonumber(d.area:GetHeight()) or nil
+  if areaH and areaH > 0 then
+    local fit = math.floor((areaH - d.y - 2 * S.gap - 18 - 4) / 18)
+    for i = #zl, math.max(0, fit) + 1, -1 do zl[i] = nil end
+  end
+  d.zones:SetEntries(zl)
   if #zl > 0 then
     d:Section(L["Online by zone"])
     d:Block(d.zones, #zl * 18)
@@ -356,13 +400,16 @@ local function BuildMembers(p)
     ns.Relayout()
   end })
   p.count = UI.Text(p, "sub", UI.C.muted, "RIGHT")
+  -- (18.11.2026) the game's look: larger fonts, so the name keeps 130 px (about 18 letters), class and rank are narrower
+  -- and zone, rank and class give way (in that order) when the list is narrow; the G column has its head "G"
+  local blizz = UI ~= Kit
   local function Head(narrow)
-    local cols = { { key = "name", text = L["Name"], width = 110, grow = true, sort = true } }
-    if not narrow then cols[#cols + 1] = { key = "class", text = L["Class"], width = 96, sort = true } end
+    local cols = { { key = "name", text = L["Name"], width = blizz and 130 or 110, grow = true, sort = true } }
+    if not narrow then cols[#cols + 1] = { key = "class", text = L["Class"], width = blizz and 70 or 96, min = 56, shrink = 3, sort = true } end
     cols[#cols + 1] = { key = "level", text = L["Lvl"], width = 30, justify = "RIGHT", sort = true, desc = true }
-    cols[#cols + 1] = { key = "guildon", text = "", width = 12, tooltip = { "Guildon", { L["G: has Guildon"] } } }
-    cols[#cols + 1] = { key = "rank", text = L["Rank"], width = narrow and 72 or 100, sort = true }
-    cols[#cols + 1] = { key = "zone", text = L["Zone / last seen"], width = narrow and 104 or 150, justify = "RIGHT", sort = true }
+    cols[#cols + 1] = { key = "guildon", text = blizz and "G" or "", width = blizz and 14 or 12, tooltip = { "Guildon", { L["G: has Guildon"] } } }
+    cols[#cols + 1] = { key = "rank", text = L["Rank"], width = narrow and 72 or (blizz and 84 or 100), min = 60, shrink = 2, sort = true }
+    cols[#cols + 1] = { key = "zone", text = L["Zone / last seen"], width = narrow and 104 or 150, min = 90, shrink = 1, justify = "RIGHT", sort = true }
     local h = UI.TableHead(p, { icon = true, columns = cols, onSort = function(key, desc)
       ns.db.memberSort = { key, desc }
       p.headWide:SetSort(key, desc) p.headNarrow:SetSort(key, desc)
@@ -390,14 +437,14 @@ local function BuildMembers(p)
   p.Hint = function() return L["Click: whisper"] .. "   " .. L["Right-click: invite to your group"] end
   p.Layout = function(self, w, h, mode)
     self._w, self._h, self._mode = w, h, mode
+    self._laidClass = self.classFilter
     local narrow = mode ~= "full"
-    local side = narrow and 0 or CENSUS_W + S.pad
+    local side = narrow and 0 or CensusW() + S.pad
     local lw = w - 2 * S.pad - side
     local y = S.gap
     self.search:ClearAllPoints()
     self.search:SetPoint("TOPLEFT", self, "TOPLEFT", S.pad, -y)
     local sw = math.min(220, math.floor(lw * 0.34))
-    self.search:Layout(sw)
     self.censusBtn:SetShown(narrow)
     self.censusBtn:SetSelected(self.censusOpen and true or false)
     self.count:ClearAllPoints()
@@ -410,6 +457,10 @@ local function BuildMembers(p)
       self.censusBtn:SetPoint("TOPRIGHT", self, "TOPLEFT", bx, -y - 2)
       bx = bx - self.censusBtn:GetWidth() - S.gap
     end
+    -- (18.11.2026) the chips keep their whole width: the search gives way (down to 120 px)
+    local need = self.chips:ContentWidth() - (bx - (S.pad + sw + S.gap))
+    if need > 0 then sw = math.max(120, sw - need) end
+    self.search:Layout(sw)
     self.chips:ClearAllPoints()
     self.chips:SetPoint("TOPLEFT", self, "TOPLEFT", S.pad + sw + S.gap, -y - 2)
     self.chips:Layout(math.max(40, bx - (S.pad + sw + S.gap)))
@@ -419,6 +470,7 @@ local function BuildMembers(p)
     head:ClearAllPoints()
     head:SetPoint("TOPLEFT", self, "TOPLEFT", S.pad, -y)
     head:Bind(self.list)
+    ns.FitColumns(head.columns, ns.RowWidth(lw), true)
     head:Layout(lw)
     y = y + S.chip
     self.list:ClearAllPoints()
@@ -428,7 +480,7 @@ local function BuildMembers(p)
     local showCensus = not narrow or self.censusOpen
     self.census:SetShown(showCensus and true or false)
     if showCensus then
-      local cwid = narrow and math.min(CENSUS_W, w - 2 * S.pad) or CENSUS_W
+      local cwid = narrow and math.min(CensusW(), w - 2 * S.pad) or CensusW()
       self.census:ClearAllPoints()
       self.census:SetPoint("TOPRIGHT", self, "TOPRIGHT", -S.pad, -S.gap)
       if narrow then self.census.close:Show() else self.census.close:Hide() end
@@ -454,6 +506,11 @@ local function BuildMembers(p)
       self.classChip:Hide()
     end
     self.chips:Place()
+    -- the class chip came or went: the search gives way to it (Layout)
+    if self._w and (cf or false) ~= (self._laidClass or false) then
+      self._laidClass = cf
+      self:Layout(self._w, self._h, self._mode)
+    end
     local data, n = ns.MemberEntries(self:Search(), filter, ns.db.memberOffline, cf, sort[1], sort[2])
     self.list:SetItems(data)
     self.list:SetEmpty(not ns.InGuild() and not ns.demo and L["You are not in a guild."] or (self:Search() ~= "" and L["Nobody found."] or L["The guild list is loading."]))
