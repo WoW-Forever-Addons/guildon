@@ -9,6 +9,9 @@ local Kit = ns.Kit
 -- (31.10.2026, C3) Professions, recipes, wishes and prices are in Guildon Crafts.
 ---------------------------------------------------------------------------
 local S = Kit.SIZE
+-- (16.11.2026) the blocks of the page: the window's kit (DonCore Kit, or the game's look with the option blizzLook;
+-- GuildShared/Window.lua ns.PageKit), taken when the page is built
+local UI = Kit
 local AgeText = ns.UI.AgeText
 
 ns.TABS = {
@@ -35,24 +38,25 @@ local function OpenCrafts()
 end
 
 local function BuildOverview(p)
-  p.hero = Kit.Hero(p, { height = 72 })
+  UI = ns.PageKit and ns.PageKit() or Kit
+  p.hero = UI.Hero(p, { height = 72 })
   p.hero:SetPoint("TOPLEFT", p, "TOPLEFT", 0, 0)
   p.tiles = {
-    members = Kit.Tile(p, { label = L["Members"] }),
-    guildon = Kit.Tile(p, { label = L["With Guildon"] }),
-    sets = Kit.Tile(p, { label = L["Data sets"] }),
-    last = Kit.Tile(p, { label = L["Last data from the guild"] }),
-    game = Kit.Tile(p, { label = L["Game version"] }),
-    crafts = Kit.Tile(p, { label = L["Professions and wishes"], onClick = OpenCrafts }),
+    members = UI.Tile(p, { label = L["Members"] }),
+    guildon = UI.Tile(p, { label = L["With Guildon"] }),
+    sets = UI.Tile(p, { label = L["Data sets"] }),
+    last = UI.Tile(p, { label = L["Last data from the guild"] }),
+    game = UI.Tile(p, { label = L["Game version"] }),
+    crafts = UI.Tile(p, { label = L["Professions and wishes"], onClick = OpenCrafts }),
   }
   p.order = { "members", "guildon", "sets", "last", "game", "crafts" }
   p.tiles.crafts:SetTooltip(L["Guildon: Crafts & Recipes"], { L["Professions, recipes, wish list and trade of the guild."] }, L["Click: open Guildon Crafts"])
   -- without a guild: the player's own characters
-  p.chars = Kit.List(p, { zebra = true })
+  p.chars = UI.List(p, { zebra = true })
   p.chars:Hide()
   -- bottom: a note and the example guild (layout review 25.10.: without a guild the page was empty)
-  p.note = Kit.Text(p, "sub", Kit.C.muted)
-  p.demo = Kit.Button(p, "", { small = true, onClick = function()
+  p.note = UI.Text(p, "sub", UI.C.muted)
+  p.demo = UI.Button(p, "", { small = true, onClick = function()
     if ns.SetDemo then ns.SetDemo(not ns.demo) end
     if p:IsShown() then p:Refresh() p:Layout(p._w, p._h, p._mode) end
   end })
@@ -83,7 +87,7 @@ local function BuildOverview(p)
     self.demo:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", -S.pad, S.gap)
     self.note:ClearAllPoints()
     self.note:SetPoint("BOTTOMLEFT", self, "BOTTOMLEFT", x0, S.gap + 6)
-    Kit.Fit(self.note, inner - (self.demo:IsShown() and self.demo:GetWidth() + S.gap or 0))
+    UI.Fit(self.note, inner - (self.demo:IsShown() and self.demo:GetWidth() + S.gap or 0))
   end
   p.Refresh = function(self)
     local g, rank = ns.GuildInfo()
@@ -133,7 +137,7 @@ local function BuildOverview(p)
     local cd = type(rawget(_G, "GuildonCrafts_OnAddonCompartmentClick")) == "function"
     t.crafts:SetData(L["Professions and wishes"], cd and L["Crafts & Recipes"] or L["not loaded"],
       cd and L["Click: open Guildon Crafts"] or L["Guildon Crafts is not loaded: professions, recipes and wishes are in it."],
-      cd and Kit.C.txGold or Kit.C.muted)
+      cd and UI.C.txGold or UI.C.muted)
     t.crafts:SetDisabled(not cd)
     if ns.demo then
       self.note:SetText(L["Example guild is on: the members ending in -Demo are made up and only on your screen. /gn demo off removes them."])
@@ -202,8 +206,8 @@ function ns.MemberEntries(search, filter, showOffline, class, sortKey, desc)
     local peer = Peer(m)
     local cls = ns.ClassHex(m.classFile)
     local e = { kind = "table", key = m.name, member = m, class = m.classFile, status = m.online and "green" or nil, dim = not m.online,
-      cells = { "|c" .. cls .. m.short .. "|r", { text = m.class or "", color = Kit.C.muted }, { text = tostring(m.level or 0), color = Kit.C.title },
-        { text = peer and "G" or "", color = Kit.C.txGold }, m.rank or "", { text = LastSeen(m), color = m.online and Kit.C.muted or Kit.C.quiet } },
+      cells = { "|c" .. cls .. m.short .. "|r", { text = m.class or "", color = UI.C.muted }, { text = tostring(m.level or 0), color = UI.C.title },
+        { text = peer and "G" or "", color = UI.C.txGold }, m.rank or "", { text = LastSeen(m), color = m.online and UI.C.muted or UI.C.quiet } },
       tooltipFn = function()
         local lines = { m.rank, (m.class or "") .. " " .. (m.level or 0), peer and L["Guildon %s"]:format(peer.v) or L["without Guildon"] }
         for _, l in ipairs(ns.MemberLines and ns.MemberLines(m) or {}) do lines[#lines + 1] = l end
@@ -243,13 +247,13 @@ function ns.ClassCounts(filter, search)
 end
 
 local function Census(p)
-  local d = Kit.Detail(p, { onClose = function() p.censusOpen = nil ns.Relayout() end })
+  local d = UI.Detail(p, { onClose = function() p.censusOpen = nil ns.Relayout() end })
   d.nums = CreateFrame("Frame", nil, d)
   d.nums:SetHeight(40)
   d.nums.cells = {}
   for i = 1, 3 do
-    local v = Kit.Text(d.nums, "hero", Kit.C.hero)
-    local l = Kit.Text(d.nums, "sub", Kit.C.muted)
+    local v = UI.Text(d.nums, "hero", UI.C.hero)
+    local l = UI.Text(d.nums, "sub", UI.C.muted)
     d.nums.cells[i] = { v, l }
   end
   function d.nums:Set(list) for i, c in ipairs(self.cells) do c[1]:SetText(list[i][1]) c[2]:SetText(list[i][2]) end end
@@ -259,19 +263,19 @@ local function Census(p)
     for i, c in ipairs(self.cells) do
       c[1]:ClearAllPoints() c[1]:SetPoint("TOPLEFT", self, "TOPLEFT", (i - 1) * each, 0)
       c[2]:ClearAllPoints() c[2]:SetPoint("TOPLEFT", self, "TOPLEFT", (i - 1) * each, -24)
-      Kit.Fit(c[1], each - 6) Kit.Fit(c[2], each - 6)
+      UI.Fit(c[1], each - 6) UI.Fit(c[2], each - 6)
     end
   end
-  d.classes = Kit.BarList(d, { onClick = function(e)
+  d.classes = UI.BarList(d, { onClick = function(e)
     p.classFilter = p.classFilter ~= e.key and e.key or nil
     p:Refresh()
   end })
-  d.levels = Kit.Columns(d, #LEVEL_BANDS)
+  d.levels = UI.Columns(d, #LEVEL_BANDS)
   d.levelNames = CreateFrame("Frame", nil, d)
   d.levelNames:SetHeight(14)
   d.levelNames.texts = {}
   for i, band in ipairs(LEVEL_BANDS) do
-    local t = Kit.Text(d.levelNames, "mono", Kit.C.quiet, "CENTER")
+    local t = UI.Text(d.levelNames, "mono", UI.C.quiet, "CENTER")
     t:SetText(band[1] == band[2] and tostring(band[1]) or (band[1] .. "-" .. band[2]))
     d.levelNames.texts[i] = t
   end
@@ -281,10 +285,10 @@ local function Census(p)
     local cw = (w - 3 * (n - 1)) / n
     for i, t in ipairs(self.texts) do
       t:ClearAllPoints() t:SetPoint("LEFT", self, "LEFT", (i - 1) * (cw + 3), 0)
-      Kit.Fit(t, math.max(8, cw))
+      UI.Fit(t, math.max(8, cw))
     end
   end
-  d.zones = Kit.BarList(d, {})
+  d.zones = UI.BarList(d, {})
   return d
 end
 
@@ -338,19 +342,20 @@ local function FillCensus(p, d)
 end
 
 local function BuildMembers(p)
-  p.search = Kit.SearchBox(p, { placeholder = L["Name, class, zone, rank"], onChange = function() if p:IsShown() then p:Refresh() end end })
-  p.chips = Kit.ChipBar(p, { onChange = function(key)
+  UI = ns.PageKit and ns.PageKit() or Kit
+  p.search = UI.SearchBox(p, { placeholder = L["Name, class, zone, rank"], onChange = function() if p:IsShown() then p:Refresh() end end })
+  p.chips = UI.ChipBar(p, { onChange = function(key)
     if key == "class" then p.classFilter = nil
     else ns.db.memberFilter = key ~= "all" and key or nil end
     p:Refresh()
   end })
   for _, k in ipairs({ "all", "online", "guildon" }) do p.chips:Add(k, L[MEM_FILTER_TEXT[k]]) end
   p.classChip = p.chips:Add("class", "")
-  p.censusBtn = Kit.Button(p, L["Census"], { small = true, onClick = function()
+  p.censusBtn = UI.Button(p, L["Census"], { small = true, onClick = function()
     p.censusOpen = not p.censusOpen or nil
     ns.Relayout()
   end })
-  p.count = Kit.Text(p, "sub", Kit.C.muted, "RIGHT")
+  p.count = UI.Text(p, "sub", UI.C.muted, "RIGHT")
   local function Head(narrow)
     local cols = { { key = "name", text = L["Name"], width = 110, grow = true, sort = true } }
     if not narrow then cols[#cols + 1] = { key = "class", text = L["Class"], width = 96, sort = true } end
@@ -358,7 +363,7 @@ local function BuildMembers(p)
     cols[#cols + 1] = { key = "guildon", text = "", width = 12, tooltip = { "Guildon", { L["G: has Guildon"] } } }
     cols[#cols + 1] = { key = "rank", text = L["Rank"], width = narrow and 72 or 100, sort = true }
     cols[#cols + 1] = { key = "zone", text = L["Zone / last seen"], width = narrow and 104 or 150, justify = "RIGHT", sort = true }
-    local h = Kit.TableHead(p, { icon = true, columns = cols, onSort = function(key, desc)
+    local h = UI.TableHead(p, { icon = true, columns = cols, onSort = function(key, desc)
       ns.db.memberSort = { key, desc }
       p.headWide:SetSort(key, desc) p.headNarrow:SetSort(key, desc)
       p:Refresh()
@@ -367,7 +372,7 @@ local function BuildMembers(p)
     return h
   end
   p.headWide, p.headNarrow = Head(false), Head(true)
-  p.list = Kit.List(p, {
+  p.list = UI.List(p, {
     -- the group "Offline" folds (the list turns item.collapsed, the choice is kept)
     onToggle = function(e)
       if e.fold then ns.db.memberOffline = not e.collapsed or nil end
@@ -397,8 +402,8 @@ local function BuildMembers(p)
     self.censusBtn:SetSelected(self.censusOpen and true or false)
     self.count:ClearAllPoints()
     self.count:SetPoint("TOPRIGHT", self, "TOPLEFT", S.pad + lw, -y - 7)
-    Kit.Fit(self.count, 110)
-    local cw = math.min(Kit.TextWidth(self.count), 110)
+    UI.Fit(self.count, 110)
+    local cw = math.min(UI.TextWidth(self.count), 110)
     local bx = S.pad + lw - cw - S.gap
     if narrow then
       self.censusBtn:ClearAllPoints()

@@ -6,6 +6,9 @@ local L = ns.L
 -- old Map tab and the old Options tab. The cog in the window's header, /gn options and the Blizzard AddOns page open it.
 -- Tabs: Map (sharing, pins, sizes, opacity, layer, with a preview of the pins), Window (minimap button, place), Tools
 -- (status, example guild, sync, commands).
+-- (16.11.2026) With the option blizzLook (on by default) and the game's templates at login the same options are pages in
+-- the game's settings (Options > AddOns > Guildon: Map & Members, DonCore Settings 4 fullPages) and every cog and /gn options
+-- ends there (DonCore Options spec.redirect); the preview of the pins stays in DonCore's window (a button there).
 ---------------------------------------------------------------------------
 local Opt = LibStub("DonCore-1.0"):Get("Options", 2)
 
@@ -21,6 +24,7 @@ ns.OPTION_DEFAULTS = {
   mapShare = "guild", mapHidePvP = false, mapWorld = true, mapMinimap = true, mapInstance = false, mapLayer = false,
   pinStyle = "emblem", mapWorldScale = 0.6, mapMiniScale = 0.65, mapPinAlpha = 1, minimapButton = true, mapArrow = "auto",
   mapOwnArrow = true, mapAltClick = false, mapShowGroup = false, -- (07.11.2026, a player on Discord) DonMap draws the own arrow above the pins (DonMapAPI 6)
+  blizzLook = true, -- (16.11.2026, Daniel: "Sollte Standart sein") the window in the game's look (Core.lua ns.LookKit)
 }
 
 local function Percent(v) return ("%d %%"):format(math.floor((tonumber(v) or 0) * 100 + 0.5)) end
@@ -72,6 +76,10 @@ local ITEMS = {
       return out
     end },
   { header = "Window" },
+  -- (16.11.2026, Daniel: the Blizzard look of Profitdon and Luredon for all Don addons, on by default) the window is built
+  -- again in the other look (GuildShared/Window.lua ns.WindowReset)
+  { key = "blizzLook", name = "Windows in the game's look",
+    tip = "Guildon's window looks like the game's own: the game's frame, tabs, buttons and lists. Off: the Don look. Where the game lacks its templates (Classic Era) the window keeps the Don look. The options then open in the game's settings (Options > AddOns > Guildon: Map & Members) after a /reload." },
   { key = "minimapButton", name = "Minimap button", tip = "Shows the Guildon button at the minimap. All Guildon parts share it." },
   { kind = "button", optKey = "button:resetWindow", name = "Reset window position", button = "Reset",
     tip = "Puts the Guildon window back in the middle of the screen at its first size.", onClick = function() if ns.ResetWindow then ns.ResetWindow() end end },
@@ -104,6 +112,42 @@ local function Preview(f, w, h)
   end
 end
 
+-- the tabs of DonCore's window; the game's settings get the same lists as pages
+local MAP_MAIN = { "header:Sharing", "mapShare", "mapHidePvP", "mapInstance", "header:Pins", "mapWorld", "mapMinimap", "mapShowGroup",
+  "mapOwnArrow", "pinStyle", "mapWorldScale", "mapMiniScale", "mapPinAlpha", "mapAltClick" }
+local MAP_MORE = { "mapArrow", "mapLayer" }
+local WINDOW_MAIN = { "blizzLook", "minimapButton", "button:resetWindow" }
+
+-- one change, from DonCore's window or the game's settings
+local function Changed(key)
+  if key == "mapArrow" and ns.ArrowStop then ns.ArrowStop() end -- the next right-click uses the new arrow
+  if key == "blizzLook" then
+    if ns.WindowReset then ns.WindowReset() end -- the window in the other look
+  else
+    if key == "minimapButton" then if ns.RefreshMinimapButton then ns.RefreshMinimapButton() end
+    elseif key and key:find("^map") or key == "pinStyle" then Pins() end
+    if ns.Refresh then ns.Refresh() end
+  end
+  if ns.RefreshSettingsUI then ns.SafeCall("settings", ns.RefreshSettingsUI) end -- the game's settings show the new value
+end
+
+local function Status()
+  local total, online, guildon = ns.MemberCounts()
+  return { ("Guildon %s"):format(tostring(ns.VERSION or "")),
+    ns.InGuild() and L["%d members"]:format(total) .. ", " .. L["online: %d"]:format(online) .. ", " .. L["With Guildon"] .. ": " .. guildon
+      or L["You are not in a guild."] }
+end
+
+local function Tools()
+  return {
+    { "Example guild", "On / off", function() if ns.SetDemo then ns.SetDemo(not ns.demo) end end,
+      "Made-up members to try the windows, only on your screen.", state = function() return ns.demo and true or false end },
+    { "Sync", "Ask now", function() if ns.Hello then ns.Hello(true) end ns.Print(L["Asked the guild for new data."]) end,
+      "Asks the guild for new data now." },
+  }
+end
+
+local direct = false -- (16.11.2026) DonCore's window on purpose (the preview), not the game's settings
 local function Register()
   if not (Opt and Opt.Register) then return end
   local db = ns.db
@@ -120,34 +164,18 @@ local function Register()
     tabs = {
       { key = "map", title = "Map", icon = "Interface\\Icons\\INV_Misc_Map_01", preview = Preview,
         text = "Who sees you on the map, and how the guild members look on the world map and the minimap.",
-        main = { "header:Sharing", "mapShare", "mapHidePvP", "mapInstance", "header:Pins", "mapWorld", "mapMinimap", "mapShowGroup", "mapOwnArrow", "pinStyle",
-          "mapWorldScale", "mapMiniScale", "mapPinAlpha", "mapAltClick" }, more = { "mapArrow", "mapLayer" } },
+        main = MAP_MAIN, more = MAP_MORE },
       { key = "window", title = "Window", icon = "Interface\\Icons\\INV_Misc_GroupNeedMore",
         text = "The minimap button of all Guildon parts and the place of the window.",
-        main = { "minimapButton", "button:resetWindow" } },
+        main = WINDOW_MAIN },
       { key = "tools", title = "Tools", text = "Status", status = true, tools = { "Example guild", "Sync" } },
     },
     pages = function() return { { items = ITEMS } } end,
-    tools = function() return {
-      { "Example guild", "On / off", function() if ns.SetDemo then ns.SetDemo(not ns.demo) end end,
-        "Made-up members to try the windows, only on your screen.", state = function() return ns.demo and true or false end },
-      { "Sync", "Ask now", function() if ns.Hello then ns.Hello(true) end ns.Print(L["Asked the guild for new data."]) end,
-        "Asks the guild for new data now." },
-    } end,
+    tools = Tools,
     db = function() return ns.db end,
     default = function(key) return ns.OPTION_DEFAULTS[key] end,
-    changed = function(key)
-      if key == "mapArrow" and ns.ArrowStop then ns.ArrowStop() end -- the next right-click uses the new arrow
-      if key == "minimapButton" then if ns.RefreshMinimapButton then ns.RefreshMinimapButton() end
-      elseif key and key:find("^map") or key == "pinStyle" then Pins() end
-      if ns.Refresh then ns.Refresh() end
-    end,
-    status = function()
-      local total, online, guildon = ns.MemberCounts()
-      return { ("Guildon %s"):format(tostring(ns.VERSION or "")),
-        ns.InGuild() and L["%d members"]:format(total) .. ", " .. L["online: %d"]:format(online) .. ", " .. L["With Guildon"] .. ": " .. guildon
-          or L["You are not in a guild."] }
-    end,
+    changed = Changed,
+    status = Status,
     help = function()
       local lines = {}
       for _, c in ipairs(ns.COMMANDS or {}) do lines[#lines + 1] = c[1] .. "  " .. L[c[2]] end
@@ -155,11 +183,78 @@ local function Register()
     end,
     T = function(s) return L[s] end,
     labels = function(s) return L[s] end,
+    -- (16.11.2026, DonCore Options 6) with the option blizzLook every cog and /gn options ends in the game's settings
+    redirect = function() if direct then return false end return ns.OpenGameOptions and ns.OpenGameOptions() or false end,
   })
+end
+
+---------------------------------------------------------------------------
+-- (16.11.2026) The game's settings: the same items as pages, built at login when the option blizzLook is on and the client
+-- has the game's templates (else nothing there, as before). A change of the option works for the options after a /reload.
+---------------------------------------------------------------------------
+local category, fullPages = nil, false
+
+local function ItemOf(key)
+  for _, it in ipairs(ITEMS) do if it.key == key or it.optKey == key then return it end end
+end
+local function PageItems(...)
+  local out = {}
+  for _, keys in ipairs({ ... }) do
+    for _, k in ipairs(keys) do
+      local head = k:match("^header:(.+)$")
+      if head then out[#out + 1] = { header = head } else out[#out + 1] = ItemOf(k) end
+    end
+  end
+  return out
+end
+
+local function GamePages()
+  local map = PageItems(MAP_MAIN, MAP_MORE)
+  -- the preview of the pins has no place in the game's settings: DonCore's window shows it
+  map[#map + 1] = { kind = "button", name = "Preview of the pins", button = "Show",
+    tip = "Shows the pins in the chosen look, size and opacity in DonCore's options window.",
+    onClick = function() if ns.OpenDonWindow then ns.OpenDonWindow("map") end end }
+  return {
+    { title = "Map", tip = "Who sees you on the map, and how the guild members look on the world map and the minimap.", items = map },
+    { title = "Window", tip = "The minimap button of all Guildon parts and the place of the window.", items = PageItems(WINDOW_MAIN) },
+  }
+end
+ns.GameOptionPages = GamePages -- (tests)
+
+local function BuildGameOptions()
+  category, fullPages = nil, false
+  if not (ns.BuildSettings and ns.db and ns.db.blizzLook ~= false and ns.LookKit and select(2, ns.LookKit())) then return end
+  category = ns.BuildSettings({ name = "Guildon: Map & Members", ownWindow = true, fullPages = true,
+    status = Status, tools = Tools(), pages = GamePages(),
+    db = function() return ns.db end, default = function(key) return ns.OPTION_DEFAULTS[key] end, changed = Changed,
+    T = function(s) return L[s] end })
+  fullPages = category ~= nil
+end
+ns.BuildGameOptions = BuildGameOptions -- (tests)
+
+-- true when the game's settings were opened at Guildon (option blizzLook, pages built at login, not in combat)
+function ns.OpenGameOptions()
+  if not (ns.db and ns.db.blizzLook ~= false and fullPages and category and Settings and Settings.OpenToCategory) then return false end
+  if InCombatLockdown and InCombatLockdown() then ns.Print(L["Not in combat."]) return true end
+  Settings.OpenToCategory(category:GetID())
+  return true
+end
+function ns.OptionsLook() return fullPages and "game settings" or "don window" end
+
+-- DonCore's window at Guildon although the options are the game's (the preview of the pins)
+function ns.OpenDonWindow(tab)
+  if not (Opt and Opt.Open) then return nil end
+  direct = true
+  local win = ns.SafeCall("options window", Opt.OpenFromBlizzard or Opt.Open, ns.OPTIONS_ID, tab)
+  direct = false
+  return win
 end
 
 function ns.OpenOptions(tab)
   if Opt and Opt.Open then Opt.Open(ns.OPTIONS_ID, tab) return true end
 end
 
-ns.OnInit(function() ns.SafeCall("options", Register) end)
+ns.OnInit(function()
+  ns.SafeCall("options", Register)
+  ns.SafeCall("game options", BuildGameOptions)
+end)

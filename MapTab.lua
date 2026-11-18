@@ -9,6 +9,9 @@ local Kit = ns.Kit
 -- how the player shares and opens that option (Daniel 02.11.2026: "Statusknopf bleibt").
 ---------------------------------------------------------------------------
 local S = Kit.SIZE
+-- (16.11.2026) the blocks of the page: the window's kit (DonCore Kit, or the game's look with the option blizzLook;
+-- GuildShared/Window.lua ns.PageKit), taken when the page is built
+local UI = Kit
 local DETAIL_W = 280
 local SHARE_TEXT = { guild = "With the guild", group = "Only with my group", off = "Off" }
 local MAP_FILTER_TEXT = { all = "All", here = "My zone" }
@@ -58,8 +61,8 @@ function ns.MapEntries(search, filter)
         local p, name = m.p, m.name
         local cls = ns.ClassHex(p.class)
         out[#out + 1] = { kind = "table", key = name, name = name, p = p, zone = z.name, class = p.class, status = "green",
-          cells = { "|c" .. cls .. m.short .. "|r", { text = m.class, color = Kit.C.muted }, { text = tostring(p.level or 0), color = Kit.C.title },
-            { text = layer and ns.LayerLine(p) or "", color = Kit.C.muted }, { text = Ago(p), color = Kit.C.quiet } },
+          cells = { "|c" .. cls .. m.short .. "|r", { text = m.class, color = UI.C.muted }, { text = tostring(p.level or 0), color = UI.C.title },
+            { text = layer and ns.LayerLine(p) or "", color = UI.C.muted }, { text = Ago(p), color = UI.C.quiet } },
           tooltipFn = function()
             return "|c" .. cls .. m.short .. "|r", { z.name, layer and ns.LayerLine(p) or nil,
               ns.CanArrow and ns.CanArrow() and L["Right-click: arrow to this member"] or nil },
@@ -87,40 +90,41 @@ local function FillDetail(p, d, e)
   if name ~= ns.MyName() then acts[#acts + 1] = { text = L["Whisper"], onClick = function() ns.WhisperMember(name) end } end
   d:SetActions(acts)
   d:Begin()
-  d:Line(L["Zone"], Kit.C.muted, e.zone, Kit.C.title)
-  if ns.ShowLayer() then d:Line(L["Layer"], Kit.C.muted, ns.LayerLine(pos), Kit.C.title) end
-  d:Line(L["Reported"], Kit.C.muted, Ago(pos), Kit.C.title)
-  if m and m.rank and m.rank ~= "" then d:Line(L["Rank"], Kit.C.muted, m.rank, Kit.C.title) end
+  d:Line(L["Zone"], UI.C.muted, e.zone, UI.C.title)
+  if ns.ShowLayer() then d:Line(L["Layer"], UI.C.muted, ns.LayerLine(pos), UI.C.title) end
+  d:Line(L["Reported"], UI.C.muted, Ago(pos), UI.C.title)
+  if m and m.rank and m.rank ~= "" then d:Line(L["Rank"], UI.C.muted, m.rank, UI.C.title) end
   local lines = m and ns.MemberLines and ns.MemberLines(m) or {}
   if #lines > 0 then
     d:Section(L["More"])
     for _, l in ipairs(lines) do d:Line(l) end
   end
   d:Section(L["Clicks"])
-  d:Line(L["Click: show on the world map"], Kit.C.muted)
-  if ns.CanArrow and ns.CanArrow() then d:Line(L["Right-click: arrow to this member"], Kit.C.muted) end
+  d:Line(L["Click: show on the world map"], UI.C.muted)
+  if ns.CanArrow and ns.CanArrow() then d:Line(L["Right-click: arrow to this member"], UI.C.muted) end
   d:End()
 end
 
 ns.PAGE_BUILDERS.map = function(p)
-  p.search = Kit.SearchBox(p, { placeholder = L["Name, zone"], onChange = function() if p:IsShown() then p:Refresh() end end })
-  p.chips = Kit.ChipBar(p, { onChange = function(key) ns.db.mapFilter = key ~= "all" and key or nil p:Refresh() end })
+  UI = ns.PageKit and ns.PageKit() or Kit
+  p.search = UI.SearchBox(p, { placeholder = L["Name, zone"], onChange = function() if p:IsShown() then p:Refresh() end end })
+  p.chips = UI.ChipBar(p, { onChange = function(key) ns.db.mapFilter = key ~= "all" and key or nil p:Refresh() end })
   for _, k in ipairs({ "all", "here" }) do p.chips:Add(k, L[MAP_FILTER_TEXT[k]]) end
-  p.count = Kit.Text(p, "sub", Kit.C.muted, "RIGHT")
+  p.count = UI.Text(p, "sub", UI.C.muted, "RIGHT")
   -- (Daniel 02.11.2026) the status of sharing; a click opens the option
-  p.share = Kit.Button(p, "", { small = true, onClick = OpenShareOption })
+  p.share = UI.Button(p, "", { small = true, onClick = OpenShareOption })
   p.share.dot = p.share:CreateTexture(nil, "OVERLAY")
   p.share.dot:SetTexture("Interface\\Buttons\\WHITE8x8")
   p.share.dot:SetSize(6, 6)
   p.share.dot:SetPoint("LEFT", p.share, "LEFT", 8, 0)
   p.share:SetTooltip(L["Share my position"], { L["Who sees you on the map. Click: change it in the options."] })
-  p.head = Kit.TableHead(p, { icon = true, columns = {
+  p.head = UI.TableHead(p, { icon = true, columns = {
     { key = "name", text = L["Name"], width = 110, grow = true },
     { key = "class", text = L["Class"], width = 96 },
     { key = "level", text = L["Lvl"], width = 30, justify = "RIGHT" },
     { key = "layer", text = L["Layer"], width = 48 },
     { key = "age", text = L["Reported"], width = 70, justify = "RIGHT" } } })
-  p.list = Kit.List(p, {
+  p.list = UI.List(p, {
     onToggle = function(e)
       ns.db.mapZone = type(ns.db.mapZone) == "table" and ns.db.mapZone or {}
       ns.db.mapZone[e.fold] = not e.collapsed
@@ -138,7 +142,7 @@ ns.PAGE_BUILDERS.map = function(p)
     end,
   })
   p.list:SetEmpty(L["No member with Guildon is sharing a position right now."])
-  p.detail = Kit.Detail(p, { onClose = function() p.picked, p.lastClick = nil, nil p.list:Select(nil) ns.Relayout() end })
+  p.detail = UI.Detail(p, { onClose = function() p.picked, p.lastClick = nil, nil p.list:Select(nil) ns.Relayout() end })
   p.Search = function(self) return tostring(self.search:GetText() or ""):lower():gsub("^%s+", ""):gsub("%s+$", "") end
   p.Hint = function() return L["Only members with Guildon can be shown; in dungeons and raids only with the option."] end
   p.Picked = function(self)
@@ -161,8 +165,8 @@ ns.PAGE_BUILDERS.map = function(p)
     self.share:SetPoint("TOPRIGHT", self, "TOPLEFT", S.pad + lw, -y - 2)
     self.count:ClearAllPoints()
     self.count:SetPoint("TOPRIGHT", self.share, "TOPLEFT", -S.gap, -5)
-    Kit.Fit(self.count, 120)
-    local cx = S.pad + lw - self.share:GetWidth() - S.gap - math.min(Kit.TextWidth(self.count), 120) - S.gap
+    UI.Fit(self.count, 120)
+    local cx = S.pad + lw - self.share:GetWidth() - S.gap - math.min(UI.TextWidth(self.count), 120) - S.gap
     self.chips:ClearAllPoints()
     self.chips:SetPoint("TOPLEFT", self, "TOPLEFT", S.pad + sw + S.gap, -y - 2)
     self.chips:Layout(math.max(40, cx - (S.pad + sw + S.gap)))
@@ -193,14 +197,14 @@ ns.PAGE_BUILDERS.map = function(p)
         self.detail:SetHead({ title = L["Map"], meta = L["Pick a member in the list."] })
         self.detail:SetActions({ { text = L["Options"], onClick = OpenShareOption } })
         self.detail:Begin()
-        self.detail:Para(L["Members with Guildon who share their position are listed here by zone. Click a member to see more, right-click for the arrow."], Kit.C.muted)
+        self.detail:Para(L["Members with Guildon who share their position are listed here by zone. Click a member to see more, right-click for the arrow."], UI.C.muted)
         self.detail:End()
       end
     end
   end
   p.Refresh = function(self)
     local share = ns.db.mapShare or "guild"
-    local st = Kit.STATUS[SHARE_COLOR[share] or "grey"]
+    local st = UI.STATUS[SHARE_COLOR[share] or "grey"]
     self.share:SetText("   " .. L["You share: %s"]:format(L[SHARE_TEXT[share] or SHARE_TEXT.guild]))
     self.share.dot:SetVertexColor(st.fg[1], st.fg[2], st.fg[3], 1)
     self.chips:SetActive(ns.db.mapFilter == "here" and "here" or "all")

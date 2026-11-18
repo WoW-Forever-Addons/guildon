@@ -1,6 +1,7 @@
 local addonName, ns = ...
 local L = ns.L
 ns.Style = LibStub("DonCore-1.0"):Get("Style", 4):ForAddon() -- DonCore's Style (Libs/DonCore/Style.lua) for texts: Hex, Number, Wordmark, tooltips; the windows are built from DonCore's Kit (02.11.2026)
+LibStub("DonCore-1.0"):Get("Settings", 1):Attach(addonName, ns) -- (16.11.2026) the pages in the game's settings with the option blizzLook (Libs\DonCore\Settings.lua minor 4, Options.lua)
 
 ---------------------------------------------------------------------------
 -- Guildon: one addon for the whole guild (GUILDON_PLAN.md). Step 1: frame, guild roster, exchange core.
@@ -17,6 +18,21 @@ ns.defaults = {
   peers = {},          -- Guildon users seen: full name -> { v = version, t = time() }
 }
 ns.SCHEMA = 1
+
+-- (16.11.2026, Daniel: the Blizzard look as the default for all Don addons) the kit for Guildon's window: DonCore's Kit, or
+-- with the option blizzLook (on by default) the same blocks from the game's own templates (DonCore module Blizz). Returns
+-- kit, isBlizzard, reason (GuildShared/Window.lua picks it when the window is built). A client without the templates (Era)
+-- keeps the Don look without a word.
+function ns.LookKit()
+  local Core = LibStub("DonCore-1.0")
+  local Kit = Core:Get("Kit", 4)
+  if not (ns.db and ns.db.blizzLook ~= false) then return Kit, false, nil end
+  local Bz = Core:Get("Blizz", 5)
+  if not Bz then return Kit, false, "no DonCore Blizz" end
+  local kit, miss = Bz.Kit()
+  if kit then return kit, true end
+  return Kit, false, "missing: " .. tostring(miss)
+end
 ns.WORDMARK = "|cff3fa9f5Guil|rdon"
 -- own prefix per game version, so Forever and Era data never mix (like Questdon's QdShareEra)
 ns.PREFIX = ns.ERA and "GuildonEra" or "Guildon"
@@ -48,23 +64,58 @@ end
 ns.ADDON_TITLE = "Guildon"
 -- (31.10.2026) one of the Guildon parts: its entry at the shared minimap button (Shared/Launcher.lua)
 ns.MODULE = { id = "map", title = "Guildon: Map & Members", icon = "Interface\\Icons\\INV_Misc_Map_01", order = 1 }
-function ns.DiagExtra()
+function ns.DiagExtra(out)
+  out = out or print
   local ws = ns.WorldPinState and ns.WorldPinState()
-  if not DonMapAPI then print("  DonMap is missing: no guild members on the maps") end -- (30.10.2026) DonMap draws the pins
+  if not DonMapAPI then out("  DonMap is missing: no guild members on the maps") end -- (30.10.2026) DonMap draws the pins
+  if ns.WindowLook then out("  window look: " .. tostring(ns.WindowLook())) end -- (16.11.2026) "blizzard" or "kit (why)"
+  if ns.OptionsLook then out("  options: " .. ns.OptionsLook()) end -- (16.11.2026) "game settings" or "don window"
   if ws then
-    print(("  world map: shown map %s, you on %s, canvas %dx%d, scale %.2f, positions %d, on this map %d, pins %d; first pin visible %s, alpha %s, size %s, level %s (canvas %s)")
+    out(("  world map: shown map %s, you on %s, canvas %dx%d, scale %.2f, positions %d, on this map %d, pins %d; first pin visible %s, alpha %s, size %s, level %s (canvas %s)")
       :format(tostring(ws.map), tostring(ws.mine), ws.w or 0, ws.h or 0, ws.scale or 0, ws.have, ws.onMap, ws.pins, tostring(ws.vis),
         tostring(ws.alpha), tostring(ws.size), tostring(ws.level), tostring(ws.canvasLevel)))
-    print(("  map levels: explored areas %s, area POI %s"):format(tostring(ws.expl), tostring(ws.poi)))
-    if ws.openMap then print(("  OpenMap stitches the world map: pins above its art (top level %s)"):format(tostring(ws.openMapTop))) end
+    out(("  map levels: explored areas %s, area POI %s"):format(tostring(ws.expl), tostring(ws.poi)))
+    if ws.openMap then out(("  OpenMap stitches the world map: pins above its art (top level %s)"):format(tostring(ws.openMapTop))) end
   else
-    print("  world map: not looked at yet (open the world map once, then /gn diag)")
+    out("  world map: not looked at yet (open the world map once, then /gn diag)")
   end
   -- (27.10., Frankston: our pins over Questie and GatherMate) the levels of the other addons' pins, to place ours below
   if ns.ForeignPinLevels then
-    for _, line in ipairs(ns.ForeignPinLevels()) do print("  " .. line) end
+    for _, line in ipairs(ns.ForeignPinLevels()) do out("  " .. line) end
   end
-  if not GuildonCrafts_OnAddonCompartmentClick then print("  Guildon Crafts is missing: no professions, recipes or wishes") end
+  if not GuildonCrafts_OnAddonCompartmentClick then out("  Guildon Crafts is missing: no professions, recipes or wishes") end
+end
+
+-- (16.11.2026, Daniel: "bei allen addons soll der diag befehl ein fenster zum kopieren aufmachen", "Gleich im neuen
+-- Stil") /gn diag opens DonCore's copy window with the lines of ns.PrintDiag (GuildShared/Comm.lua), handed to it as
+-- its output (the global print stays untouched, changing it would taint it). "/gn diag chat" prints.
+function ns.DiagLines()
+  local lines = {}
+  local function add(s)
+    lines[#lines + 1] = (tostring(s):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|H.-|h(.-)|h", "%1"))
+  end
+  if not ns.PrintDiag then return lines end
+  local ok, err = pcall(ns.PrintDiag, add)
+  if not ok then add("  error [diag]: " .. tostring(err)) end
+  return lines
+end
+
+function ns.ShowDiag()
+  local text = table.concat(ns.DiagLines(), "\n")
+  local title, hint = "Guildon diag", L["Ctrl+A, Ctrl+C copies the report."]
+  local words = { selectAll = L["Select all"], close = L["Close"] }
+  -- the game's look first (its error is kept for the next diag), then the Kit, then the chat as before
+  local d = ns.SafeCall("diag window", function()
+    local UI, blizz = ns.LookKit()
+    if blizz and UI and UI.ShowCopy then
+      local box = ns.SafeCall("diag blizz look", UI.ShowCopy, title, hint, text, words)
+      if box then return box end
+    end
+    local Kit = LibStub("DonCore-1.0"):Get("Kit", 4)
+    return Kit.ShowCopy(title, hint, text, words)
+  end)
+  if d then return d end
+  if ns.PrintDiag then ns.PrintDiag() end
 end
 
 function Guildon_OnAddonCompartmentClick()
@@ -81,7 +132,8 @@ ns.COMMANDS = {
   { "/gn members", "the guild members" },
   { "/gn options", "all settings (also the cog in the window)" },
   { "/gn sync", "ask the guild for new data now" },
-  { "/gn diag", "state of the exchange and errors" },
+  { "/gn diag", "state of the exchange and errors, in a window to copy" },
+  { "/gn diag chat", "the same in the chat" },
   { "/gn layer", "what the layer reading sees (target a creature first)" },
   { "/gn mem", "memory of Guildon and DonMap, measured for 30 seconds (/gn mem 60: longer)" },
   { "/gn demo", "example guild to try the windows (again: off)" },
@@ -107,6 +159,8 @@ function ns.Slash(msg)
   elseif msg == "demo" or msg == "demo on" or msg == "demo off" or msg == "beispiel" then
     if ns.SetDemo then ns.SetDemo(msg == "demo off" and false or (msg == "demo on" and true or not ns.demo)) end
   elseif msg == "diag" then
+    ns.ShowDiag()
+  elseif msg == "diag chat" then
     if ns.PrintDiag then ns.PrintDiag() end
   elseif msg:match("^mem") or msg:match("^speicher") then
     ns.MemoryCheck(tonumber(msg:match("(%d+)")))

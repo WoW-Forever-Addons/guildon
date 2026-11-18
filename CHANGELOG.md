@@ -1,5 +1,12 @@
 # Changes
 
+## 0.13.0
+- **The game's look, out of the box:** the Guildon window and all its pages (members, overview, census) use the game's own frame, tabs, buttons and lists, with the guild crest in the round portrait. Prefer the old look? Turn off "Windows in the game's look" in the options (tab Window); the change applies at once.
+- **Options in the game's settings:** all options are now pages under Options > AddOns > Guildon: Map & Members. The gear, `/gn options` and the minimap menu open them there. What the game's settings cannot do, like the preview of the pins, opens in the Don options window from a button. Needs a game restart once; without the game's templates (Classic Era) or with the option off, everything stays in the Don window as before.
+- **"Example guild" as a checkbox:** the example guild in the options now shows whether it is on or off.
+- **Sorting the member list:** after a click on a column head, names no longer lie on top of each other with class, level and rank one column off.
+- **`/gn diag` opens a window:** the report appears in a window you can copy from; `/gn diag chat` prints it in the chat as before.
+
 ## 0.12.2
 
 - **Cleaner text in narrow places:** text that is shrunk to fit keeps one font and size, also after the game window changes its size.

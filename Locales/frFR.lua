@@ -78,7 +78,11 @@ L["ask the guild for new data now"] = "demander maintenant de nouvelles données
 L["example guild to try the windows (again: off)"] = "guilde d’exemple pour essayer les fenêtres (encore : désactivée)"
 L["offline"] = "hors ligne"
 L["show or hide the window"] = "afficher ou masquer la fenêtre"
-L["state of the exchange and errors"] = "état de l’échange et erreurs"
+L["state of the exchange and errors, in a window to copy"] = "état de l’échange et erreurs, dans une fenêtre à copier"
+L["the same in the chat"] = "la même chose dans le chat"
+L["Ctrl+A, Ctrl+C copies the report."] = "Ctrl+A, Ctrl+C copie le rapport."
+L["Select all"] = "Tout sélectionner"
+L["Close"] = "Fermer"
 L["the guild members"] = "les membres de la guilde"
 L["this list"] = "cette liste"
 L["today"] = "aujourd’hui"
@@ -226,3 +230,13 @@ L["%d members with a position; pins: %d on the world map, %d on the minimap"] = 
 -- (07.11.2026) group members as pins
 L["Group members as pins"] = "Membres du groupe en repères"
 L["Off by default: members of your party or raid get no guild pin, the game already shows them. On: they get one as well."] = "Désactivé par défaut : les membres de votre groupe ou raid n'ont pas de repère de guilde, le jeu les affiche déjà. Activé : ils en ont un aussi."
+-- (16.11.2026) the window in the game's look (Options.lua blizzLook, GuildShared/Window.lua)
+L["Windows in the game's look"] = "Fenêtres dans le style du jeu"
+L["Guildon's window looks like the game's own: the game's frame, tabs, buttons and lists. Off: the Don look. Where the game lacks its templates (Classic Era) the window keeps the Don look. The options then open in the game's settings (Options > AddOns > Guildon: Map & Members) after a /reload."] = "La fenêtre de Guildon ressemble à celles du jeu : cadre, onglets, boutons et listes du jeu. Désactivé : le style Don. Là où le jeu n'a pas ses modèles (Classic Era), la fenêtre garde le style Don. Les options s'ouvrent alors dans les réglages du jeu (Options > AddOns > Guildon: Map & Members) après un /reload."
+L["The window could not be built in the game's look, it opens in the Don look. %s says why."] = "La fenêtre n'a pas pu être construite dans le style du jeu, elle s'ouvre dans le style Don. %s indique pourquoi."
+-- (16.11.2026) the options as pages in the game's settings (Options.lua, DonCore Settings 4)
+L["Settings"] = "Réglages"
+L["Open"] = "Ouvrir"
+L["Preview of the pins"] = "Aperçu des repères"
+L["Shows the pins in the chosen look, size and opacity in DonCore's options window."] = "Affiche les repères avec l'apparence, la taille et l'opacité choisies dans la fenêtre d'options de DonCore."
+L["Not in combat."] = "Pas en combat."
