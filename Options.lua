@@ -78,8 +78,10 @@ local ITEMS = {
   { header = "Window" },
   -- (16.11.2026, Daniel: the Blizzard look of Profitdon and Luredon for all Don addons, on by default) the window is built
   -- again in the other look (GuildShared/Window.lua ns.WindowReset)
-  { key = "blizzLook", name = "Windows in the game's look",
-    tip = "Guildon's window looks like the game's own: the game's frame, tabs, buttons and lists. Off: the Don look. Where the game lacks its templates (Classic Era) the window keeps the Don look. The options then open in the game's settings (Options > AddOns > Guildon: Map & Members) after a /reload." },
+  -- (20.11.2026, Daniel: the same name in every Don addon) the choice "Window style" with "Don look" / "Blizzard look" from
+  -- DonCore (Settings minor 6 ns.LookOption, on ns since Core.lua's Attach), still the boolean db.blizzLook. No onChange:
+  -- Changed() below does the switch, and DonCore's window would run an onChange a second time (donCommon).
+  ns.LookOption({ addon = "Guildon", category = "Guildon: Map & Members" }),
   { key = "minimapButton", name = "Minimap button", tip = "Shows the Guildon button at the minimap. All Guildon parts share it." },
   { kind = "button", optKey = "button:resetWindow", name = "Reset window position", button = "Reset",
     tip = "Puts the Guildon window back in the middle of the screen at its first size.", onClick = function() if ns.ResetWindow then ns.ResetWindow() end end },

@@ -230,8 +230,6 @@ L["%d members with a position; pins: %d on the world map, %d on the minimap"] = 
 L["Group members as pins"] = "파티원도 표시로"
 L["Off by default: members of your party or raid get no guild pin, the game already shows them. On: they get one as well."] = "기본값 꺼짐: 파티나 공격대의 길드원은 길드 표시가 없습니다. 게임이 이미 보여줍니다. 켜면: 그들도 표시됩니다."
 -- (16.11.2026) the window in the game's look (Options.lua blizzLook, GuildShared/Window.lua)
-L["Windows in the game's look"] = "게임 스타일의 창"
-L["Guildon's window looks like the game's own: the game's frame, tabs, buttons and lists. Off: the Don look. Where the game lacks its templates (Classic Era) the window keeps the Don look. The options then open in the game's settings (Options > AddOns > Guildon: Map & Members) after a /reload."] = "Guildon 창이 게임 자체 창처럼 보입니다: 게임의 테두리, 탭, 버튼, 목록. 끄기: Don 스타일. 게임에 템플릿이 없는 곳(클래식 에라)에서는 창이 Don 스타일로 유지됩니다. 설정은 /reload 후 게임 설정(설정 > 애드온 > Guildon: Map & Members)에서 열립니다."
 L["The window could not be built in the game's look, it opens in the Don look. %s says why."] = "창을 게임 스타일로 만들 수 없어 Don 스타일로 엽니다. %s에서 이유를 볼 수 있습니다."
 -- (16.11.2026) the options as pages in the game's settings (Options.lua, DonCore Settings 4)
 L["Settings"] = "설정"

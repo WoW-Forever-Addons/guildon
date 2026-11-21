@@ -231,8 +231,6 @@ L["%d members with a position; pins: %d on the world map, %d on the minimap"] = 
 L["Group members as pins"] = "Membros do grupo como marcadores"
 L["Off by default: members of your party or raid get no guild pin, the game already shows them. On: they get one as well."] = "Desligado por padrão: membros do seu grupo ou raide não recebem marcador da guilda, o jogo já os mostra. Ligado: também recebem um."
 -- (16.11.2026) the window in the game's look (Options.lua blizzLook, GuildShared/Window.lua)
-L["Windows in the game's look"] = "Janelas com o visual do jogo"
-L["Guildon's window looks like the game's own: the game's frame, tabs, buttons and lists. Off: the Don look. Where the game lacks its templates (Classic Era) the window keeps the Don look. The options then open in the game's settings (Options > AddOns > Guildon: Map & Members) after a /reload."] = "A janela do Guildon fica como as do jogo: moldura, abas, botões e listas do jogo. Desligado: o visual Don. Onde o jogo não tem seus modelos (Classic Era), a janela mantém o visual Don. As opções passam a abrir nas configurações do jogo (Opções > AddOns > Guildon: Map & Members) depois de um /reload."
 L["The window could not be built in the game's look, it opens in the Don look. %s says why."] = "A janela não pôde ser montada com o visual do jogo, ela abre com o visual Don. %s diz o motivo."
 -- (16.11.2026) the options as pages in the game's settings (Options.lua, DonCore Settings 4)
 L["Settings"] = "Configurações"

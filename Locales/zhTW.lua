@@ -230,8 +230,6 @@ L["%d members with a position; pins: %d on the world map, %d on the minimap"] = 
 L["Group members as pins"] = "隊伍成員也顯示標記"
 L["Off by default: members of your party or raid get no guild pin, the game already shows them. On: they get one as well."] = "預設關閉：你隊伍或團隊中的成員不顯示公會標記，遊戲已經會顯示他們。開啟：他們也會有標記。"
 -- (16.11.2026) the window in the game's look (Options.lua blizzLook, GuildShared/Window.lua)
-L["Windows in the game's look"] = "遊戲風格的視窗"
-L["Guildon's window looks like the game's own: the game's frame, tabs, buttons and lists. Off: the Don look. Where the game lacks its templates (Classic Era) the window keeps the Don look. The options then open in the game's settings (Options > AddOns > Guildon: Map & Members) after a /reload."] = "Guildon 的視窗看起來像遊戲本身的視窗：遊戲的邊框、分頁、按鈕和清單。關閉：Don 風格。遊戲缺少範本的地方（經典時期）視窗維持 Don 風格。/reload 之後，選項會在遊戲的設定中開啟（選項 > 插件 > Guildon: Map & Members）。"
 L["The window could not be built in the game's look, it opens in the Don look. %s says why."] = "無法以遊戲風格建立視窗，改以 Don 風格開啟。%s 會說明原因。"
 -- (16.11.2026) the options as pages in the game's settings (Options.lua, DonCore Settings 4)
 L["Settings"] = "設定"
