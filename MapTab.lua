@@ -109,6 +109,20 @@ local function FillDetail(p, d, e)
   d:End()
 end
 
+-- (21.11.2026, Ruckler) what the page shows apart from the ages: when this is the same, a tick only writes the ages
+local sigParts = {}
+local function Signature(p, pos)
+  local t, n = sigParts, 0
+  local function Put(v) n = n + 1 t[n] = tostring(v) end
+  Put(ns.PlayerMapPos and ns.PlayerMapPos() or "") Put(ns.ShowLayer() and 1 or 0) Put(ns.db.mapShare or "guild")
+  Put(ns.db.mapFilter or "") Put(p:Search())
+  for name, q in pairs(pos) do
+    Put(name) Put(q.map) Put(q.level) Put(q.class) Put(ns.LayerLine(q) or "")
+  end
+  for i = #t, n + 1, -1 do t[i] = nil end
+  return table.concat(t, "\31", 1, n)
+end
+
 ns.PAGE_BUILDERS.map = function(p)
   UI = ns.PageKit and ns.PageKit() or Kit
   p.search = UI.SearchBox(p, { placeholder = L["Name, zone"], onChange = function() if p:IsShown() then p:Refresh() end end })
@@ -243,6 +257,7 @@ ns.PAGE_BUILDERS.map = function(p)
     self.share.dot:SetVertexColor(st.fg[1], st.fg[2], st.fg[3], 1)
     self.chips:SetActive(ns.db.mapFilter == "here" and "here" or "all")
     local data = ns.MapEntries(self:Search(), ns.db.mapFilter)
+    self._sig = Signature(self, ns.Positions())
     -- the head that fits the layer option, before the rows are drawn under it
     if (self.head == self.headLayer) ~= (ns.ShowLayer() and true or false) and self._w then self:Layout(self._w, self._h, self._mode) end
     self.list:SetItems(data)
@@ -256,9 +271,26 @@ ns.PAGE_BUILDERS.map = function(p)
     if self._w then self:Layout(self._w, self._h, self._mode) end
   end
   -- the ages count up while the page is open
+  -- (21.11.2026, Ruckler) every 2 s only the age cells (and the picked member's card) are written anew; the whole page
+  -- only when what it shows has changed (Signature: members, zones, levels, layers, the own zone, search, filter)
   p.tick = 0
   p:SetScript("OnUpdate", function(self, dt)
     self.tick = self.tick + dt
-    if self.tick >= 2 then self.tick = 0 self:Refresh() end
+    if self.tick >= 2 then self.tick = 0 self:Tick() end
   end)
+  p.Tick = function(self)
+    local pos = ns.Positions()
+    if Signature(self, pos) ~= self._sig then self:Refresh() return end
+    for _, e in ipairs(self.list.items or {}) do
+      local cur = e.name and e.p and pos[e.name]
+      if cur and e.cells then
+        e.p = cur
+        local age = e.cells[#e.cells]
+        if type(age) == "table" then age.text = Ago(cur) end
+      end
+    end
+    self.list:Draw()
+    local e = self:Picked()
+    if e and self.detail:IsShown() then FillDetail(self, self.detail, e) end
+  end
 end
