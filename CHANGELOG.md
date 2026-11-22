@@ -1,5 +1,9 @@
 # Changes
 
+## 0.13.5
+
+- **Smoother play:** fixed a short stutter every few seconds. With the windows closed the guild roster is no longer read anew after every update the game sends, only when the number of members or of members online changed, and at most every 10 seconds. Online and offline notices can come a few seconds later than before; with a window open nothing changes.
+
 ## 0.13.4
 
 - **Smoother play:** fixed short stutters. When the game reports no realm name (it can stay empty for a whole session on WoW Forever), every guild name made the addon count through all saved data; the realm is now remembered. Guildon and Guildon: Crafts also share one guild roster instead of each rebuilding it in the same moment, and incoming addon messages of other addons are skipped earlier.
