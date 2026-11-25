@@ -6,9 +6,8 @@ local L = ns.L
 -- old Map tab and the old Options tab. The cog in the window's header, /gn options and the Blizzard AddOns page open it.
 -- Tabs: Map (sharing, pins, sizes, opacity, layer, with a preview of the pins), Window (minimap button, place), Tools
 -- (status, example guild, sync, commands).
--- (16.11.2026) With the option blizzLook (on by default) and the game's templates at login the same options are pages in
--- the game's settings (Options > AddOns > Guildon: Map & Members, DonCore Settings 4 fullPages) and every cog and /gn options
--- ends there (DonCore Options spec.redirect); the preview of the pins stays in DonCore's window (a button there).
+-- (24.11.2026, Daniel: "nur das Optionsfenster des jeweiligen Addons") every cog and /gn options opens this window only;
+-- Blizzard's AddOns list has a short page with one button that opens it (DonCore Settings 7).
 ---------------------------------------------------------------------------
 local Opt = LibStub("DonCore-1.0"):Get("Options", 2)
 
@@ -75,7 +74,7 @@ local ITEMS = {
       end
       return out
     end },
-  { header = "Window" },
+  { header = "Windows" },
   -- (16.11.2026, Daniel: the Blizzard look of Profitdon and Luredon for all Don addons, on by default) the window is built
   -- again in the other look (GuildShared/Window.lua ns.WindowReset)
   -- (20.11.2026, Daniel: the same name in every Don addon) the choice "Window style" with "Don look" / "Blizzard look" from
@@ -114,13 +113,13 @@ local function Preview(f, w, h)
   end
 end
 
--- the tabs of DonCore's window; the game's settings get the same lists as pages
+-- the tabs of DonCore's window
 local MAP_MAIN = { "header:Sharing", "mapShare", "mapHidePvP", "mapInstance", "header:Pins", "mapWorld", "mapMinimap", "mapShowGroup",
   "mapOwnArrow", "pinStyle", "mapWorldScale", "mapMiniScale", "mapPinAlpha", "mapAltClick" }
 local MAP_MORE = { "mapArrow", "mapLayer" }
 local WINDOW_MAIN = { "blizzLook", "minimapButton", "button:resetWindow" }
 
--- one change, from DonCore's window or the game's settings
+-- one change, from DonCore's window
 local function Changed(key)
   if key == "mapArrow" and ns.ArrowStop then ns.ArrowStop() end -- the next right-click uses the new arrow
   if key == "blizzLook" then
@@ -149,7 +148,6 @@ local function Tools()
   }
 end
 
-local direct = false -- (16.11.2026) DonCore's window on purpose (the preview), not the game's settings
 local function Register()
   if not (Opt and Opt.Register) then return end
   local db = ns.db
@@ -185,72 +183,21 @@ local function Register()
     end,
     T = function(s) return L[s] end,
     labels = function(s) return L[s] end,
-    -- (16.11.2026, DonCore Options 6) with the option blizzLook every cog and /gn options ends in the game's settings
-    redirect = function() if direct then return false end return ns.OpenGameOptions and ns.OpenGameOptions() or false end,
   })
 end
 
 ---------------------------------------------------------------------------
--- (16.11.2026) The game's settings: the same items as pages, built at login when the option blizzLook is on and the client
--- has the game's templates (else nothing there, as before). A change of the option works for the options after a /reload.
+-- (24.11.2026, Daniel: only the options window of the addon) Blizzard's AddOns list gets a short page with one button
+-- that opens our window (DonCore Settings 7); the pages themselves live in DonCore's window only.
 ---------------------------------------------------------------------------
-local category, fullPages = nil, false
-
-local function ItemOf(key)
-  for _, it in ipairs(ITEMS) do if it.key == key or it.optKey == key then return it end end
-end
-local function PageItems(...)
-  local out = {}
-  for _, keys in ipairs({ ... }) do
-    for _, k in ipairs(keys) do
-      local head = k:match("^header:(.+)$")
-      if head then out[#out + 1] = { header = head } else out[#out + 1] = ItemOf(k) end
-    end
-  end
-  return out
-end
-
-local function GamePages()
-  local map = PageItems(MAP_MAIN, MAP_MORE)
-  -- the preview of the pins has no place in the game's settings: DonCore's window shows it
-  map[#map + 1] = { kind = "button", name = "Preview of the pins", button = "Show",
-    tip = "Shows the pins in the chosen look, size and opacity in DonCore's options window.",
-    onClick = function() if ns.OpenDonWindow then ns.OpenDonWindow("map") end end }
-  return {
-    { title = "Map", tip = "Who sees you on the map, and how the guild members look on the world map and the minimap.", items = map },
-    { title = "Window", tip = "The minimap button of all Guildon parts and the place of the window.", items = PageItems(WINDOW_MAIN) },
-  }
-end
-ns.GameOptionPages = GamePages -- (tests)
-
 local function BuildGameOptions()
-  category, fullPages = nil, false
-  if not (ns.BuildSettings and ns.db and ns.db.blizzLook ~= false and ns.LookKit and select(2, ns.LookKit())) then return end
-  category = ns.BuildSettings({ name = "Guildon: Map & Members", ownWindow = true, fullPages = true,
-    status = Status, tools = Tools(), pages = GamePages(),
+  if not (ns.BuildSettings and ns.db) then return end
+  ns.BuildSettings({ name = ns.OPTIONS_ID, ownWindow = true,
+    status = Status,
     db = function() return ns.db end, default = function(key) return ns.OPTION_DEFAULTS[key] end, changed = Changed,
     T = function(s) return L[s] end })
-  fullPages = category ~= nil
 end
 ns.BuildGameOptions = BuildGameOptions -- (tests)
-
--- true when the game's settings were opened at Guildon (option blizzLook, pages built at login, not in combat)
-function ns.OpenGameOptions()
-  if not (ns.db and ns.db.blizzLook ~= false and fullPages and category and Settings and Settings.OpenToCategory) then return false end
-  if InCombatLockdown and InCombatLockdown() then ns.Print(L["Not in combat."]) return true end
-  Settings.OpenToCategory(category:GetID())
-  return true
-end
-function ns.OptionsLook() return fullPages and "game settings" or "don window" end
-
--- DonCore's window at Guildon although the options are the game's (the preview of the pins)
-function ns.OpenDonWindow(tab)
-  if not (Opt and Opt.Open) then return nil end
-  direct = true
-  local win = ns.SafeCall("options window", Opt.OpenFromBlizzard or Opt.Open, ns.OPTIONS_ID, tab)
-  direct = false
-  return win
-end
 
 function ns.OpenOptions(tab)
   if Opt and Opt.Open then Opt.Open(ns.OPTIONS_ID, tab) return true end

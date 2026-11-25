@@ -1,5 +1,12 @@
 # Changes
 
+## 0.13.6
+
+- **Alts from your realm only:** the alts line in tooltips names only characters on the player's own realm or in the guild, not every character of the account on other realms.
+- **Smoother play:** the guild roster is now read in small slices over several frames instead of in one go, so large guilds no longer cause a short stutter every half minute. A message from an unknown sender in the guild channel triggers a new roster read at most every 10 minutes per name.
+- **Options in their own window:** the options button, the gear, `/gn options` and the minimap menu open only the Guildon options window, with its own pages plus General. The game's AddOns list keeps a single button that leads there.
+- **Tabs and list headers in the game's look:** tabs and the group headers of lists look like the game's own, with plus and minus on the right.
+
 ## 0.13.5
 
 - **Smoother play:** fixed a short stutter every few seconds. With the windows closed the guild roster is no longer read anew after every update the game sends, only when the number of members or of members online changed, and at most every 10 seconds. Online and offline notices can come a few seconds later than before; with a window open nothing changes.

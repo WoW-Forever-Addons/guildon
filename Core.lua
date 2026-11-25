@@ -87,7 +87,7 @@ function ns.DiagExtra(out)
   if type(lf) == "table" and lf.err then
     out(("  last fallback to the Don look (%s, Guildon %s): %s"):format(type(date) == "function" and date("%d.%m. %H:%M", tonumber(lf.t) or 0) or tostring(lf.t), tostring(lf.v), tostring(lf.err)))
   end
-  if ns.OptionsLook then out("  options: " .. ns.OptionsLook()) end -- (16.11.2026) "game settings" or "don window"
+  local Opt = LibStub("DonCore-1.0"):Get("Options", 8); if Opt and Opt.Look then out("  options: " .. tostring(Opt.Look())) end -- (24.11.2026) the look of the options window
   if ws then
     out(("  world map: shown map %s, you on %s, canvas %dx%d, scale %.2f, positions %d, on this map %d, pins %d; first pin visible %s, alpha %s, size %s, level %s (canvas %s)")
       :format(tostring(ws.map), tostring(ws.mine), ws.w or 0, ws.h or 0, ws.scale or 0, ws.have, ws.onMap, ws.pins, tostring(ws.vis),
